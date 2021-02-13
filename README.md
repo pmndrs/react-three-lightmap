@@ -2,6 +2,8 @@
 
 **In-browser lightmap baker for react-three-fiber and ThreeJS.**
 
+![example screenshot of lightmap baker output](./react-three-lightmap-example.png)
+
 [Live editable sandbox](https://codesandbox.io/s/github/pmndrs/react-three-lightmap).
 
 ## Local Development
