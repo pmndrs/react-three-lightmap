@@ -93,6 +93,8 @@ const Lightmap = React.forwardRef<
         textureFilter={textureFilter}
       >
         <IrradianceSceneManager
+          lightMapWidth={lightMapWidth}
+          lightMapHeight={lightMapHeight}
           texelsPerUnit={
             autoUV2 ? texelsPerUnit || DEFAULT_TEXELS_PER_UNIT : undefined
           }

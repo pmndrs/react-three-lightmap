@@ -7,10 +7,7 @@ import React, {
 } from 'react';
 import * as THREE from 'three';
 
-import {
-  useIrradianceTexture,
-  useIrradianceMapSize
-} from './IrradianceCompositor';
+import { useIrradianceTexture } from './IrradianceCompositor';
 import IrradianceAtlasMapper, {
   Workbench,
   AtlasMap
@@ -22,16 +19,17 @@ export const IrradianceDebugContext = React.createContext<{
 } | null>(null);
 
 const IrradianceSceneManager: React.FC<{
+  lightMapWidth: number;
+  lightMapHeight: number;
   texelsPerUnit?: number;
   children: (
     workbench: Workbench | null,
     startWorkbench: (scene: THREE.Scene) => void
   ) => React.ReactNode;
-}> = ({ texelsPerUnit, children }) => {
+}> = ({ lightMapWidth, lightMapHeight, texelsPerUnit, children }) => {
   const texelsPerUnitRef = useRef(texelsPerUnit); // read only once
 
   const lightMap = useIrradianceTexture();
-  const [lightMapWidth, lightMapHeight] = useIrradianceMapSize();
 
   // read once
   const lightMapWidthRef = useRef(lightMapWidth);
