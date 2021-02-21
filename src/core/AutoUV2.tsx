@@ -120,6 +120,21 @@ function traverseAutoUV2Items(
   }
 }
 
+const MAX_AUTO_SIZE = 512; // @todo make this configurable? but 512x512 is a lot to compute already
+
+function autoSelectSize(layoutSize: number): number {
+  // start with reasonable minimum size and keep trying increasing powers of 2
+  for (let size = 4; size <= MAX_AUTO_SIZE; size *= 2) {
+    if (layoutSize < size) {
+      return size;
+    }
+  }
+
+  throw new Error(
+    `minimum lightmap dimension for auto-UV2 is ${layoutSize} which is too large: please reduce texelsPerUnit and/or polygon count`
+  );
+}
+
 interface AutoUVBox extends PotPackItem {
   uv2Attr: THREE.Float32BufferAttribute;
 
@@ -137,11 +152,11 @@ export interface AutoUV2Settings {
 }
 
 export function computeAutoUV2Layout(
-  width: number,
-  height: number,
+  initialWidth: number | undefined,
+  initialHeight: number | undefined,
   scene: THREE.Scene,
   { texelsPerUnit }: AutoUV2Settings
-) {
+): [number, number] {
   const layoutBoxes: AutoUVBox[] = [];
 
   traverseAutoUV2Items(scene, (mesh) => {
@@ -334,11 +349,19 @@ export function computeAutoUV2Layout(
   // main layout magic
   const { w: layoutWidth, h: layoutHeight } = potpack(layoutBoxes);
 
-  if (layoutWidth > width || layoutHeight > height) {
+  // check layout results against width/height if specified
+  if (
+    (initialWidth && layoutWidth > initialWidth) ||
+    (initialHeight && layoutHeight > initialHeight)
+  ) {
     throw new Error(
-      `auto-UV needs lightmap sized ${layoutWidth}x${layoutHeight}`
+      `minimum lightmap size for auto-UV2 is ${layoutWidth}x${layoutHeight} which is too large to fit provided ${initialWidth}x${initialHeight}: please reduce texelsPerUnit and/or polygon count`
     );
   }
+
+  // auto-select sizing if needed
+  const finalWidth = initialWidth || autoSelectSize(layoutWidth);
+  const finalHeight = initialHeight || autoSelectSize(layoutHeight);
 
   // based on layout box positions, fill in UV2 attribute data
   for (const layoutBox of layoutBoxes) {
@@ -354,9 +377,12 @@ export function computeAutoUV2Layout(
     for (let i = 0; i < posIndices.length; i += 1) {
       uv2Attr.setXY(
         posIndices[i],
-        (ix + posLocalX[i] * iw) / width,
-        (iy + posLocalY[i] * ih) / height
+        (ix + posLocalX[i] * iw) / finalWidth,
+        (iy + posLocalY[i] * ih) / finalHeight
       );
     }
   }
+
+  // report final dimensions
+  return [finalWidth, finalHeight];
 }

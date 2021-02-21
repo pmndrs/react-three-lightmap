@@ -13,7 +13,6 @@ import WorkManager from './WorkManager';
 import IrradianceRenderer from './IrradianceRenderer';
 import IrradianceScene from './IrradianceScene';
 
-const DEFAULT_LIGHTMAP_SIZE = 64;
 const DEFAULT_TEXELS_PER_UNIT = 2;
 
 // prevent automatic generation of UV2 coordinates for content
@@ -74,13 +73,13 @@ const Lightmap = React.forwardRef<
     sceneRef
   ) => {
     // parse the convenience setting
-    const [[lightMapWidth, lightMapHeight]] = useState(() =>
+    const [[initialWidth, initialHeight]] = useState(() =>
       lightMapSize
         ? [
             typeof lightMapSize === 'number' ? lightMapSize : lightMapSize[0],
             typeof lightMapSize === 'number' ? lightMapSize : lightMapSize[1]
           ]
-        : [DEFAULT_LIGHTMAP_SIZE, DEFAULT_LIGHTMAP_SIZE]
+        : [undefined, undefined]
     );
 
     const [isComplete, setIsComplete] = useState(false);
@@ -88,8 +87,8 @@ const Lightmap = React.forwardRef<
     return (
       <>
         <IrradianceSceneManager
-          lightMapWidth={lightMapWidth}
-          lightMapHeight={lightMapHeight}
+          initialWidth={initialWidth}
+          initialHeight={initialHeight}
           textureFilter={textureFilter}
           texelsPerUnit={
             autoUV2 ? texelsPerUnit || DEFAULT_TEXELS_PER_UNIT : undefined
