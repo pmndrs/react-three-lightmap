@@ -16,7 +16,7 @@ const MAX_PASSES = 2;
 // global conversion of display -> physical emissiveness
 // @todo this originally was 32 because emissive textures did not reflect enough scene light,
 // but making emissiveIntensity > 1 washed out the visible non-light-scene display colours
-const EMISSIVE_MULTIPLIER = 1;
+// const EMISSIVE_MULTIPLIER = 1;
 
 const tmpRgba = new THREE.Vector4();
 
@@ -255,7 +255,6 @@ const IrradianceRenderer: React.FC<{
 
   // kick off new pass when current one is complete
   useEffect(() => {
-    const { atlasMap } = workbenchRef.current;
     const { passComplete, passesRemaining } = processingState;
 
     // check if there is anything to do

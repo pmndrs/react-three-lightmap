@@ -1,5 +1,4 @@
 import React, { useRef, useMemo, useCallback, useEffect } from 'react';
-import { useResource } from 'react-three-fiber';
 import * as THREE from 'three';
 
 const FallbackListener: React.FC<{

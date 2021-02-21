@@ -31,11 +31,6 @@ export const MAX_ITEM_FACES = 1000; // used for encoding item+face index in text
 // can be arbitrary colour (empty pixels are ignored due to zero alpha)
 const ATLAS_BG_COLOR = new THREE.Color('#000000');
 
-// temp objects for computation
-const tmpNormal = new THREE.Vector3();
-const tmpU = new THREE.Vector3();
-const tmpV = new THREE.Vector3();
-
 const VERTEX_SHADER = `
   attribute vec2 uv2;
 
