@@ -40,7 +40,7 @@ export const Main: Story = () => (
 
     <DebugOverlayRenderer>
       <React.Suspense fallback={<Spinner />}>
-        <Lightmap lightMapWidth={64} lightMapHeight={64}>
+        <Lightmap>
           <mesh position={[0, 0, -2]} receiveShadow>
             <planeBufferGeometry attach="geometry" args={[20, 20]} />
             <meshPhongMaterial

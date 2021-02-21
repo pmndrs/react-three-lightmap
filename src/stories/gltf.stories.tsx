@@ -144,11 +144,7 @@ export const Main: Story = () => (
   >
     <DebugOverlayRenderer>
       <React.Suspense fallback={<Spinner />}>
-        <Lightmap
-          lightMapWidth={64}
-          lightMapHeight={64}
-          textureFilter={THREE.NearestFilter}
-        >
+        <Lightmap textureFilter={THREE.NearestFilter}>
           <MainSceneContents />
 
           <DebugOverlayWidgets />

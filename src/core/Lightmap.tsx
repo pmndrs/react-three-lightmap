@@ -12,9 +12,10 @@ import IrradianceRenderer from './IrradianceRenderer';
 import IrradianceCompositor from './IrradianceCompositor';
 import IrradianceScene from './IrradianceScene';
 
+const DEFAULT_LIGHTMAP_SIZE = 64;
+
 export interface LightmapProps {
-  lightMapWidth: number;
-  lightMapHeight: number;
+  lightMapSize?: number | [number, number];
   textureFilter?: THREE.TextureFilter;
 }
 
@@ -27,7 +28,17 @@ const LocalSuspender: React.FC = () => {
 const Lightmap = React.forwardRef<
   THREE.Scene,
   React.PropsWithChildren<LightmapProps>
->(({ lightMapWidth, lightMapHeight, textureFilter, children }, sceneRef) => {
+>(({ lightMapSize, textureFilter, children }, sceneRef) => {
+  // parse the convenience setting
+  const [[lightMapWidth, lightMapHeight]] = useState(() =>
+    lightMapSize
+      ? [
+          typeof lightMapSize === 'number' ? lightMapSize : lightMapSize[0],
+          typeof lightMapSize === 'number' ? lightMapSize : lightMapSize[1]
+        ]
+      : [DEFAULT_LIGHTMAP_SIZE, DEFAULT_LIGHTMAP_SIZE]
+  );
+
   const [isComplete, setIsComplete] = useState(false);
 
   return (
