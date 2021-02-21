@@ -3,7 +3,6 @@ import { useFrame } from 'react-three-fiber';
 import * as THREE from 'three';
 
 import { WorkManagerContext } from './WorkManager';
-import { useIrradianceRendererData } from './IrradianceCompositor';
 import { Workbench, MAX_ITEM_FACES, AtlasMap } from './IrradianceAtlasMapper';
 import {
   ProbeBatchRenderer,
@@ -205,9 +204,6 @@ const IrradianceRenderer: React.FC<{
   const onDebugLightProbeRef = useRef(props.onDebugLightProbe);
   onDebugLightProbeRef.current = props.onDebugLightProbe;
 
-  // main lightmap data accumulator
-  const [irradiance, irradianceData] = useIrradianceRendererData();
-
   // texel indexes for randomized processing (literally just a randomly shuffled index array)
   // @todo is this relevant anymore?
   const texelPickMap = useMemo(() => {
@@ -262,6 +258,8 @@ const IrradianceRenderer: React.FC<{
       return;
     }
 
+    const { irradiance, irradianceData } = workbenchRef.current;
+
     // store and discard the active layer output texture
     if (processingState.passOutput && processingState.passOutputData) {
       irradianceData.set(processingState.passOutputData);
@@ -301,7 +299,7 @@ const IrradianceRenderer: React.FC<{
         passesRemaining: prev.passesRemaining - 1
       };
     });
-  }, [processingState, irradiance, irradianceData]);
+  }, [processingState]);
 
   const probeTargetSize = 16;
   const { renderLightProbeBatch, probePixelAreaLookup } = useLightProbe(

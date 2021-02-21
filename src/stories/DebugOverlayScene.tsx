@@ -7,7 +7,6 @@ import {
 } from 'react-three-fiber';
 import * as THREE from 'three';
 
-import { useIrradianceTexture } from '../core/IrradianceCompositor';
 import { IrradianceDebugContext } from '../core/IrradianceSceneManager';
 import { PROBE_BATCH_COUNT } from '../core/IrradianceLightProbe';
 
@@ -55,13 +54,11 @@ export const DebugOverlayWidgets: React.FC = React.memo(() => {
   const debugScene = useContext(DebugOverlayContext);
   const debugInfo = useContext(IrradianceDebugContext);
 
-  const outputTexture = useIrradianceTexture();
-
   if (!debugScene || !debugInfo) {
     return null;
   }
 
-  const { atlasTexture } = debugInfo;
+  const { atlasTexture, outputTexture } = debugInfo;
 
   return (
     <>

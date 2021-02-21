@@ -7,7 +7,6 @@ import React, {
 } from 'react';
 import * as THREE from 'three';
 
-import { useIrradianceTexture } from './IrradianceCompositor';
 import IrradianceAtlasMapper, {
   Workbench,
   AtlasMap
@@ -16,24 +15,55 @@ import { computeAutoUV2Layout } from './AutoUV2';
 
 export const IrradianceDebugContext = React.createContext<{
   atlasTexture: THREE.Texture;
+  outputTexture: THREE.Texture;
 } | null>(null);
+
+function createRendererTexture(
+  atlasWidth: number,
+  atlasHeight: number,
+  textureFilter: THREE.TextureFilter
+): [THREE.Texture, Float32Array] {
+  const atlasSize = atlasWidth * atlasHeight;
+  const data = new Float32Array(4 * atlasSize);
+
+  // not filling texture with test pattern because this goes right into light probe computation
+  const texture = new THREE.DataTexture(
+    data,
+    atlasWidth,
+    atlasHeight,
+    THREE.RGBAFormat,
+    THREE.FloatType
+  );
+
+  // set desired texture filter (no mipmaps supported due to the nature of lightmaps)
+  texture.magFilter = textureFilter;
+  texture.minFilter = textureFilter;
+  texture.generateMipmaps = false;
+
+  return [texture, data];
+}
 
 const IrradianceSceneManager: React.FC<{
   lightMapWidth: number;
   lightMapHeight: number;
+  textureFilter?: THREE.TextureFilter;
   texelsPerUnit?: number;
   children: (
     workbench: Workbench | null,
     startWorkbench: (scene: THREE.Scene) => void
   ) => React.ReactNode;
-}> = ({ lightMapWidth, lightMapHeight, texelsPerUnit, children }) => {
-  const texelsPerUnitRef = useRef(texelsPerUnit); // read only once
-
-  const lightMap = useIrradianceTexture();
-
+}> = ({
+  lightMapWidth,
+  lightMapHeight,
+  textureFilter,
+  texelsPerUnit,
+  children
+}) => {
   // read once
   const lightMapWidthRef = useRef(lightMapWidth);
   const lightMapHeightRef = useRef(lightMapHeight);
+  const textureFilterRef = useRef(textureFilter);
+  const texelsPerUnitRef = useRef(texelsPerUnit); // read only once
 
   // basic snapshot triggered by start handler
   const [workbenchBasics, setWorkbenchBasics] = useState<{
@@ -82,12 +112,39 @@ const IrradianceSceneManager: React.FC<{
     return () => clearTimeout(timeoutId);
   }, [workbenchBasics]);
 
+  // lightmap texture (dependent on auto-UV2 step completion)
+  const [lightMapBasics, setLightMapBasics] = useState<{
+    irradiance: THREE.Texture;
+    irradianceData: Float32Array;
+  } | null>(null);
+  useEffect(() => {
+    setLightMapBasics((prev) => {
+      // always dispose of old texture
+      if (prev) {
+        prev.irradiance.dispose();
+      }
+
+      // reset old state if restarting the workbench
+      if (!autoUV2Complete) {
+        return null;
+      }
+
+      const [irradiance, irradianceData] = createRendererTexture(
+        lightMapWidthRef.current,
+        lightMapHeightRef.current,
+        textureFilterRef.current || THREE.LinearFilter
+      );
+
+      return { irradiance, irradianceData };
+    });
+  }, [autoUV2Complete]);
+
   // full workbench with atlas map
   const [workbench, setWorkbench] = useState<Workbench | null>(null);
 
   const atlasMapHandler = useCallback(
     (atlasMap: AtlasMap) => {
-      if (!workbenchBasics) {
+      if (!workbenchBasics || !lightMapBasics) {
         throw new Error('unexpected early call');
       }
 
@@ -95,14 +152,23 @@ const IrradianceSceneManager: React.FC<{
       setWorkbench({
         id: workbenchBasics.id,
         lightScene: workbenchBasics.scene,
-        atlasMap
+        atlasMap,
+
+        irradiance: lightMapBasics.irradiance,
+        irradianceData: lightMapBasics.irradianceData
       });
     },
-    [workbenchBasics]
+    [workbenchBasics, lightMapBasics]
   );
 
   const debugInfo = useMemo(
-    () => (workbench ? { atlasTexture: workbench.atlasMap.texture } : null),
+    () =>
+      workbench
+        ? {
+            atlasTexture: workbench.atlasMap.texture,
+            outputTexture: workbench.irradiance
+          }
+        : null,
     [workbench]
   );
 
@@ -110,12 +176,12 @@ const IrradianceSceneManager: React.FC<{
     <IrradianceDebugContext.Provider value={debugInfo}>
       {children(workbench, startHandler)}
 
-      {workbenchBasics && autoUV2Complete && (
+      {workbenchBasics && lightMapBasics && (
         <IrradianceAtlasMapper
           key={workbenchBasics.id} // re-create for new workbench
           width={lightMapWidthRef.current} // read from initial snapshot
           height={lightMapHeightRef.current} // read from initial snapshot
-          lightMap={lightMap}
+          lightMap={lightMapBasics.irradiance}
           lightScene={workbenchBasics.scene}
           onComplete={atlasMapHandler}
         />

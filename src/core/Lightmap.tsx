@@ -11,7 +11,6 @@ import { ATLAS_OPT_OUT_FLAG } from './IrradianceAtlasMapper';
 import IrradianceSceneManager from './IrradianceSceneManager';
 import WorkManager from './WorkManager';
 import IrradianceRenderer from './IrradianceRenderer';
-import IrradianceCompositor from './IrradianceCompositor';
 import IrradianceScene from './IrradianceScene';
 
 const DEFAULT_LIGHTMAP_SIZE = 64;
@@ -87,11 +86,7 @@ const Lightmap = React.forwardRef<
     const [isComplete, setIsComplete] = useState(false);
 
     return (
-      <IrradianceCompositor
-        lightMapWidth={lightMapWidth}
-        lightMapHeight={lightMapHeight}
-        textureFilter={textureFilter}
-      >
+      <>
         <IrradianceSceneManager
           lightMapWidth={lightMapWidth}
           lightMapHeight={lightMapHeight}
@@ -120,7 +115,7 @@ const Lightmap = React.forwardRef<
         </IrradianceSceneManager>
 
         {!isComplete && <LocalSuspender />}
-      </IrradianceCompositor>
+      </>
     );
   }
 );

@@ -24,6 +24,10 @@ export interface Workbench {
   id: number; // for refresh
   lightScene: THREE.Scene;
   atlasMap: AtlasMap;
+
+  // lightmap output
+  irradiance: THREE.Texture;
+  irradianceData: Float32Array;
 }
 
 export const MAX_ITEM_FACES = 1000; // used for encoding item+face index in texture
