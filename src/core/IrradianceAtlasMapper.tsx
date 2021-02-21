@@ -24,6 +24,10 @@ export interface Workbench {
   id: number; // for refresh
   lightScene: THREE.Scene;
   atlasMap: AtlasMap;
+
+  // lightmap output
+  irradiance: THREE.Texture;
+  irradianceData: Float32Array;
 }
 
 export const MAX_ITEM_FACES = 1000; // used for encoding item+face index in texture
@@ -57,6 +61,28 @@ const FRAGMENT_SHADER = `
   }
 `;
 
+// @todo support opt-in inside opt-out groups
+export const ATLAS_OPT_OUT_FLAG = Symbol('lightmap atlas opt out flag');
+
+// based on traverse() in https://github.com/mrdoob/three.js/blob/dev/src/core/Object3D.js
+function traverseAtlasItems(
+  object: THREE.Object3D,
+  callback: (object: THREE.Object3D) => void
+) {
+  // skip everything inside opt-out wrappers
+  if (
+    Object.prototype.hasOwnProperty.call(object.userData, ATLAS_OPT_OUT_FLAG)
+  ) {
+    return;
+  }
+
+  callback(object);
+
+  for (const childObject of object.children) {
+    traverseAtlasItems(childObject, callback);
+  }
+}
+
 // write out original face geometry info into the atlas map
 // each texel corresponds to: (quadX, quadY, quadIndex)
 // where quadX and quadY are 0..1 representing a spot in the original quad
@@ -89,7 +115,7 @@ const IrradianceAtlasMapper: React.FC<{
   useEffect(() => {
     const items = [] as AtlasMapInternalItem[];
 
-    lightSceneRef.current.traverse((mesh) => {
+    traverseAtlasItems(lightSceneRef.current, (mesh) => {
       if (!(mesh instanceof THREE.Mesh)) {
         return;
       }
@@ -191,29 +217,26 @@ const IrradianceAtlasMapper: React.FC<{
         originalBuffer: buffer
       });
 
-      // finally, auto-attach the lightmap
+      // finally, auto-attach the lightmap to materials that we recognize
       // (checking against accidentally overriding some unrelated lightmap)
+      // @todo allow manually attaching to custom materials too
       const material = mesh.material;
       if (
-        !material ||
-        Array.isArray(material) ||
-        (!(material instanceof THREE.MeshLambertMaterial) &&
-          !(material instanceof THREE.MeshPhongMaterial) &&
-          !(material instanceof THREE.MeshStandardMaterial))
+        material &&
+        !Array.isArray(material) &&
+        (material instanceof THREE.MeshLambertMaterial ||
+          material instanceof THREE.MeshPhongMaterial ||
+          material instanceof THREE.MeshStandardMaterial ||
+          material instanceof THREE.MeshPhysicalMaterial)
       ) {
-        // @todo check for any other applicable types, maybe anything with a lightMap property?
-        throw new Error(
-          'only single Lambert/Phong/standard materials are supported'
-        );
-      }
+        if (material.lightMap && material.lightMap !== lightMap) {
+          throw new Error(
+            'do not set your own light map manually on baked scene meshes'
+          );
+        }
 
-      if (material.lightMap && material.lightMap !== lightMap) {
-        throw new Error(
-          'do not set your own light map manually on baked scene meshes'
-        );
+        material.lightMap = lightMap;
       }
-
-      material.lightMap = lightMap;
     });
 
     // disposed during scene unmount
