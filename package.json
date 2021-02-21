@@ -16,11 +16,11 @@
     "potpack": "^1.0.1"
   },
   "scripts": {
-    "start": "tsdx watch",
-    "build": "tsdx build",
+    "start": "tsdx watch --entry src/entry.ts",
+    "build": "tsdx build --entry src/entry.ts",
     "test": "tsdx test --passWithNoTests",
     "lint": "tsdx lint",
-    "prepare": "tsdx build",
+    "prepare": "tsdx build --entry src/entry.ts",
     "size": "size-limit",
     "analyze": "size-limit --why",
     "storybook": "start-storybook -p 6006",
