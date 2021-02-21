@@ -213,29 +213,26 @@ const IrradianceAtlasMapper: React.FC<{
         originalBuffer: buffer
       });
 
-      // finally, auto-attach the lightmap
+      // finally, auto-attach the lightmap to materials that we recognize
       // (checking against accidentally overriding some unrelated lightmap)
+      // @todo allow manually attaching to custom materials too
       const material = mesh.material;
       if (
-        !material ||
-        Array.isArray(material) ||
-        (!(material instanceof THREE.MeshLambertMaterial) &&
-          !(material instanceof THREE.MeshPhongMaterial) &&
-          !(material instanceof THREE.MeshStandardMaterial))
+        material &&
+        !Array.isArray(material) &&
+        (material instanceof THREE.MeshLambertMaterial ||
+          material instanceof THREE.MeshPhongMaterial ||
+          material instanceof THREE.MeshStandardMaterial ||
+          material instanceof THREE.MeshPhysicalMaterial)
       ) {
-        // @todo check for any other applicable types, maybe anything with a lightMap property?
-        throw new Error(
-          'only single Lambert/Phong/standard materials are supported'
-        );
-      }
+        if (material.lightMap && material.lightMap !== lightMap) {
+          throw new Error(
+            'do not set your own light map manually on baked scene meshes'
+          );
+        }
 
-      if (material.lightMap && material.lightMap !== lightMap) {
-        throw new Error(
-          'do not set your own light map manually on baked scene meshes'
-        );
+        material.lightMap = lightMap;
       }
-
-      material.lightMap = lightMap;
     });
 
     // disposed during scene unmount
