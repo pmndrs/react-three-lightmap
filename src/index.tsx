@@ -10,7 +10,6 @@ import ReactDOM from 'react-dom';
 import { Canvas } from 'react-three-fiber';
 import * as THREE from 'three';
 
-import { AutoUV2Provider, AutoUV2 } from './core/AutoUV2';
 import Lightmap from './core/Lightmap';
 import Spinner from './stories/Spinner';
 import DebugControls from './stories/DebugControls';
@@ -39,32 +38,28 @@ ReactDOM.render(
   >
     <React.Suspense fallback={<Spinner />}>
       <Lightmap autoUV2 lightMapSize={128}>
-        <AutoUV2Provider texelsPerUnit={2}>
-          <mesh position={[0, 0, -0.1]} receiveShadow>
-            <planeBufferGeometry attach="geometry" args={[9, 5]} />
-            <meshLambertMaterial attach="material" color="#ffffff" />
-            <AutoUV2 />
-          </mesh>
+        <mesh position={[0, 0, -0.1]} receiveShadow>
+          <planeBufferGeometry attach="geometry" args={[9, 5]} />
+          <meshLambertMaterial attach="material" color="#ffffff" />
+        </mesh>
 
-          <mesh position={[-3.2, -0.8, 0]} castShadow receiveShadow>
-            <textBufferGeometry
-              attach="geometry"
-              args={[
-                DISPLAY_TEXT,
-                {
-                  font: helvetikerFont,
-                  size: 2,
-                  height: 1.5,
-                  curveSegments: 1
-                }
-              ]}
-            />
-            <meshLambertMaterial attach="material" color="#ffe020" />
-            <AutoUV2 />
-          </mesh>
+        <mesh position={[-3.2, -0.8, 0]} castShadow receiveShadow>
+          <textBufferGeometry
+            attach="geometry"
+            args={[
+              DISPLAY_TEXT,
+              {
+                font: helvetikerFont,
+                size: 2,
+                height: 1.5,
+                curveSegments: 1
+              }
+            ]}
+          />
+          <meshLambertMaterial attach="material" color="#ffe020" />
+        </mesh>
 
-          <directionalLight intensity={1.5} position={[-2, 2, 4]} castShadow />
-        </AutoUV2Provider>
+        <directionalLight intensity={1.5} position={[-2, 2, 4]} castShadow />
       </Lightmap>
     </React.Suspense>
 
