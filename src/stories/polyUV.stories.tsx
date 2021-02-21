@@ -3,7 +3,7 @@ import { Story, Meta } from '@storybook/react';
 import { Canvas } from 'react-three-fiber';
 import * as THREE from 'three';
 
-import Lightmap from '../core/Lightmap';
+import Lightmap, { AutoUV2Ignore } from '../core/Lightmap';
 import Spinner from './Spinner';
 import DebugControls from './DebugControls';
 import { DebugOverlayRenderer, DebugOverlayWidgets } from './DebugOverlayScene';
@@ -29,10 +29,12 @@ export const Main: Story = () => (
     <DebugOverlayRenderer>
       <React.Suspense fallback={<Spinner />}>
         <Lightmap autoUV2 texelsPerUnit={4}>
-          <mesh position={[0, 0, -2]} receiveShadow>
-            <planeBufferGeometry attach="geometry" args={[20, 20]} />
-            <meshLambertMaterial attach="material" color="#ffffff" />
-          </mesh>
+          <AutoUV2Ignore>
+            <mesh position={[0, 0, -2]} receiveShadow>
+              <planeBufferGeometry attach="geometry" args={[20, 20]} />
+              <meshLambertMaterial attach="material" color="#ffffff" />
+            </mesh>
+          </AutoUV2Ignore>
 
           <mesh position={[0, 0, 0]} castShadow receiveShadow>
             <circleBufferGeometry attach="geometry" args={[2, 4]} />

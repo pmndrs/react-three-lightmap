@@ -98,6 +98,28 @@ function guessOrthogonalOrigin(
   return minI;
 }
 
+// @todo support opt-in inside opt-out groups
+export const AUTO_UV2_OPT_OUT_FLAG = Symbol('auto-UV2 opt out flag');
+
+// based on traverse() in https://github.com/mrdoob/three.js/blob/dev/src/core/Object3D.js
+function traverseAutoUV2Items(
+  object: THREE.Object3D,
+  callback: (object: THREE.Object3D) => void
+) {
+  // skip everything inside opt-out wrappers
+  if (
+    Object.prototype.hasOwnProperty.call(object.userData, AUTO_UV2_OPT_OUT_FLAG)
+  ) {
+    return;
+  }
+
+  callback(object);
+
+  for (const childObject of object.children) {
+    traverseAutoUV2Items(childObject, callback);
+  }
+}
+
 interface AutoUVBox extends PotPackItem {
   uv2Attr: THREE.Float32BufferAttribute;
 
@@ -122,7 +144,7 @@ export function computeAutoUV2Layout(
 ) {
   const layoutBoxes: AutoUVBox[] = [];
 
-  scene.traverse((mesh) => {
+  traverseAutoUV2Items(scene, (mesh) => {
     if (!(mesh instanceof THREE.Mesh)) {
       return;
     }

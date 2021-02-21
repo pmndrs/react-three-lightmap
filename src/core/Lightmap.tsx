@@ -6,6 +6,7 @@
 import React, { useState, useMemo } from 'react';
 import * as THREE from 'three';
 
+import { AUTO_UV2_OPT_OUT_FLAG } from './AutoUV2';
 import IrradianceSceneManager from './IrradianceSceneManager';
 import WorkManager from './WorkManager';
 import IrradianceRenderer from './IrradianceRenderer';
@@ -13,6 +14,19 @@ import IrradianceCompositor from './IrradianceCompositor';
 import IrradianceScene from './IrradianceScene';
 
 const DEFAULT_LIGHTMAP_SIZE = 64;
+
+export const AutoUV2Ignore: React.FC = ({ children }) => {
+  return (
+    <group
+      name="Auto-UV2 opt out wrapper"
+      userData={{
+        [AUTO_UV2_OPT_OUT_FLAG]: true
+      }}
+    >
+      {children}
+    </group>
+  );
+};
 
 export interface LightmapProps {
   lightMapSize?: number | [number, number];
