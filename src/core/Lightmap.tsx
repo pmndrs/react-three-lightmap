@@ -17,6 +17,8 @@ import IrradianceScene from './IrradianceScene';
 const DEFAULT_LIGHTMAP_SIZE = 64;
 const DEFAULT_TEXELS_PER_UNIT = 2;
 
+// prevent automatic generation of UV2 coordinates for content
+// (but still allow contribution to lightmap, for e.g. emissive objects, large occluders, etc)
 export const AutoUV2Ignore: React.FC = ({ children }) => {
   return (
     <group
@@ -33,6 +35,7 @@ export const AutoUV2Ignore: React.FC = ({ children }) => {
 // if there is no context provider, default to "not in progress"
 const LightmapProgressContext = React.createContext(false);
 
+// prevent wrapped content from affecting the lightmap
 export const LightmapIgnore: React.FC = ({ children }) => {
   const inProgress = useContext(LightmapProgressContext);
 
@@ -42,7 +45,7 @@ export const LightmapIgnore: React.FC = ({ children }) => {
       visible={!inProgress} // hide during baking so that this content does not contribute to irradiance
       userData={{
         [AUTO_UV2_OPT_OUT_FLAG]: true, // no need for auto-UV2 if ignored during baking
-        [ATLAS_OPT_OUT_FLAG]: true
+        [ATLAS_OPT_OUT_FLAG]: true // no point in including this in atlas
       }}
     >
       {children}
