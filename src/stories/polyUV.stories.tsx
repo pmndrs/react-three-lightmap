@@ -30,26 +30,26 @@ export const Main: Story = () => (
     <DebugOverlayRenderer>
       <React.Suspense fallback={<Spinner />}>
         <Lightmap>
-          <mesh position={[0, 0, -2]} receiveShadow>
-            <planeBufferGeometry attach="geometry" args={[20, 20]} />
-            <meshLambertMaterial attach="material" color="#ffffff" />
-          </mesh>
-
           <AutoUV2Provider texelsPerUnit={4}>
+            <mesh position={[0, 0, -2]} receiveShadow>
+              <planeBufferGeometry attach="geometry" args={[20, 20]} />
+              <meshLambertMaterial attach="material" color="#ffffff" />
+            </mesh>
+
             <mesh position={[0, 0, 0]} castShadow receiveShadow>
               <circleBufferGeometry attach="geometry" args={[2, 4]} />
               <meshLambertMaterial attach="material" color="#c0c0c0" />
               <AutoUV2 />
             </mesh>
+
+            <directionalLight
+              intensity={1}
+              position={[-2.5, 2.5, 4]}
+              castShadow
+            />
+
+            <DebugOverlayWidgets />
           </AutoUV2Provider>
-
-          <directionalLight
-            intensity={1}
-            position={[-2.5, 2.5, 4]}
-            castShadow
-          />
-
-          <DebugOverlayWidgets />
         </Lightmap>
       </React.Suspense>
     </DebugOverlayRenderer>

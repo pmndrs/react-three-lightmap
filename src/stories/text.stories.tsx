@@ -41,16 +41,16 @@ export const Main: Story = () => (
     <DebugOverlayRenderer>
       <React.Suspense fallback={<Spinner />}>
         <Lightmap>
-          <mesh position={[0, 0, -2]} receiveShadow>
-            <planeBufferGeometry attach="geometry" args={[20, 20]} />
-            <meshPhongMaterial
-              attach="material"
-              color="#808080"
-              //shininess={0}
-            />
-          </mesh>
-
           <AutoUV2Provider texelsPerUnit={4}>
+            <mesh position={[0, 0, -2]} receiveShadow>
+              <planeBufferGeometry attach="geometry" args={[20, 20]} />
+              <meshPhongMaterial
+                attach="material"
+                color="#808080"
+                //shininess={0}
+              />
+            </mesh>
+
             <mesh position={[-2, -1, 0]} castShadow receiveShadow>
               <textBufferGeometry
                 attach="geometry"
@@ -67,18 +67,18 @@ export const Main: Story = () => (
               <meshPhongMaterial attach="material" color="#c0c0c0" />
               <AutoUV2 />
             </mesh>
+
+            <spotLight
+              angle={0.75}
+              distance={25}
+              intensity={2}
+              penumbra={0.5}
+              position={[-8, 8, 8]}
+              castShadow
+            />
+
+            <DebugOverlayWidgets />
           </AutoUV2Provider>
-
-          <spotLight
-            angle={0.75}
-            distance={25}
-            intensity={2}
-            penumbra={0.5}
-            position={[-8, 8, 8]}
-            castShadow
-          />
-
-          <DebugOverlayWidgets />
         </Lightmap>
       </React.Suspense>
     </DebugOverlayRenderer>

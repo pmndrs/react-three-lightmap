@@ -62,9 +62,9 @@ ReactDOM.render(
             <meshLambertMaterial attach="material" color="#ffe020" />
             <AutoUV2 />
           </mesh>
-        </AutoUV2Provider>
 
-        <directionalLight intensity={1.5} position={[-2, 2, 4]} castShadow />
+          <directionalLight intensity={1.5} position={[-2, 2, 4]} castShadow />
+        </AutoUV2Provider>
       </Lightmap>
     </React.Suspense>
 

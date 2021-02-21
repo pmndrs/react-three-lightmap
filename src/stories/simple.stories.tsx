@@ -59,15 +59,15 @@ export const Main: Story = () => (
               <meshLambertMaterial attach="material" color="#ff0000" />
               <AutoUV2 />
             </mesh>
+
+            <directionalLight
+              intensity={1}
+              position={[-2.5, 2.5, 4]}
+              castShadow
+            />
+
+            <DebugOverlayWidgets />
           </AutoUV2Provider>
-
-          <directionalLight
-            intensity={1}
-            position={[-2.5, 2.5, 4]}
-            castShadow
-          />
-
-          <DebugOverlayWidgets />
         </Lightmap>
       </React.Suspense>
     </DebugOverlayRenderer>
