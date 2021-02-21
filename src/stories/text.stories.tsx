@@ -50,7 +50,7 @@ export const Main: Story = () => (
             />
           </mesh>
 
-          <AutoUV2Provider texelSize={0.25}>
+          <AutoUV2Provider texelsPerUnit={4}>
             <mesh position={[-2, -1, 0]} castShadow receiveShadow>
               <textBufferGeometry
                 attach="geometry"

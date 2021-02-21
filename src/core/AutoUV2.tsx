@@ -115,14 +115,14 @@ interface AutoUVBox extends PotPackItem {
 }
 
 export interface AutoUV2Settings {
-  texelSize: number;
+  texelsPerUnit: number;
 }
 
 function computeAutoUV2Layout(
   width: number,
   height: number,
   meshList: THREE.Mesh[],
-  { texelSize }: AutoUV2Settings
+  { texelsPerUnit }: AutoUV2Settings
 ) {
   const layoutBoxes: AutoUVBox[] = [];
 
@@ -295,8 +295,8 @@ function computeAutoUV2Layout(
     }
 
     // texel box is aligned to texel grid
-    const boxWidthInTexels = Math.ceil(realWidth / texelSize);
-    const boxHeightInTexels = Math.ceil(realHeight / texelSize);
+    const boxWidthInTexels = Math.ceil(realWidth * texelsPerUnit);
+    const boxHeightInTexels = Math.ceil(realHeight * texelsPerUnit);
 
     // layout box positioning is in texels
     layoutBox.w = boxWidthInTexels + 2; // plus margins
@@ -346,11 +346,11 @@ interface AutoUV2Info {
 const AutoUV2Context = React.createContext<AutoUV2Info | null>(null);
 
 export const AutoUV2Provider: React.FC<AutoUV2Settings> = ({
-  texelSize,
+  texelsPerUnit,
   children
 }) => {
   const [lightMapWidth, lightMapHeight] = useIrradianceMapSize();
-  const texelSizeRef = useRef(texelSize); // read only once
+  const texelsPerUnitRef = useRef(texelsPerUnit); // read only once
 
   const resolverRef = useRef<(() => void) | null>(null);
 
@@ -371,7 +371,7 @@ export const AutoUV2Provider: React.FC<AutoUV2Settings> = ({
         lightMapWidth,
         lightMapHeight,
         Object.values(contextValue.register),
-        { texelSize: texelSizeRef.current }
+        { texelsPerUnit: texelsPerUnitRef.current }
       );
 
       // clear waiting status in context object (so that suspenders return normally)
