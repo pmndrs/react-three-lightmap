@@ -3,7 +3,7 @@
  * Licensed under the MIT license
  */
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useContext } from 'react';
 import * as THREE from 'three';
 
 import { AUTO_UV2_OPT_OUT_FLAG } from './AutoUV2';
@@ -30,10 +30,16 @@ export const AutoUV2Ignore: React.FC = ({ children }) => {
   );
 };
 
+// if there is no context provider, default to "not in progress"
+const LightmapProgressContext = React.createContext(false);
+
 export const LightmapIgnore: React.FC = ({ children }) => {
+  const inProgress = useContext(LightmapProgressContext);
+
   return (
     <group
       name="Lightmap opt out wrapper"
+      visible={!inProgress} // hide during baking so that this content does not contribute to irradiance
       userData={{
         [AUTO_UV2_OPT_OUT_FLAG]: true, // no need for auto-UV2 if ignored during baking
         [ATLAS_OPT_OUT_FLAG]: true
@@ -89,7 +95,7 @@ const Lightmap = React.forwardRef<
           }
         >
           {(workbench, startWorkbench) => (
-            <>
+            <LightmapProgressContext.Provider value={!isComplete}>
               <WorkManager>
                 {workbench && !isComplete && (
                   <IrradianceRenderer
@@ -104,7 +110,7 @@ const Lightmap = React.forwardRef<
               <IrradianceScene ref={sceneRef} onReady={startWorkbench}>
                 {children}
               </IrradianceScene>
-            </>
+            </LightmapProgressContext.Provider>
           )}
         </IrradianceSceneManager>
 
