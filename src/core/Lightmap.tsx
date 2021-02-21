@@ -6,16 +6,34 @@
 import React, { useState, useMemo } from 'react';
 import * as THREE from 'three';
 
+import { AUTO_UV2_OPT_OUT_FLAG } from './AutoUV2';
 import IrradianceSceneManager from './IrradianceSceneManager';
 import WorkManager from './WorkManager';
 import IrradianceRenderer from './IrradianceRenderer';
 import IrradianceCompositor from './IrradianceCompositor';
 import IrradianceScene from './IrradianceScene';
 
+const DEFAULT_LIGHTMAP_SIZE = 64;
+const DEFAULT_TEXELS_PER_UNIT = 2;
+
+export const AutoUV2Ignore: React.FC = ({ children }) => {
+  return (
+    <group
+      name="Auto-UV2 opt out wrapper"
+      userData={{
+        [AUTO_UV2_OPT_OUT_FLAG]: true
+      }}
+    >
+      {children}
+    </group>
+  );
+};
+
 export interface LightmapProps {
-  lightMapWidth: number;
-  lightMapHeight: number;
+  lightMapSize?: number | [number, number];
   textureFilter?: THREE.TextureFilter;
+  autoUV2?: boolean;
+  texelsPerUnit?: number;
 }
 
 const LocalSuspender: React.FC = () => {
@@ -27,39 +45,58 @@ const LocalSuspender: React.FC = () => {
 const Lightmap = React.forwardRef<
   THREE.Scene,
   React.PropsWithChildren<LightmapProps>
->(({ lightMapWidth, lightMapHeight, textureFilter, children }, sceneRef) => {
-  const [isComplete, setIsComplete] = useState(false);
+>(
+  (
+    { lightMapSize, textureFilter, autoUV2, texelsPerUnit, children },
+    sceneRef
+  ) => {
+    // parse the convenience setting
+    const [[lightMapWidth, lightMapHeight]] = useState(() =>
+      lightMapSize
+        ? [
+            typeof lightMapSize === 'number' ? lightMapSize : lightMapSize[0],
+            typeof lightMapSize === 'number' ? lightMapSize : lightMapSize[1]
+          ]
+        : [DEFAULT_LIGHTMAP_SIZE, DEFAULT_LIGHTMAP_SIZE]
+    );
 
-  return (
-    <IrradianceCompositor
-      lightMapWidth={lightMapWidth}
-      lightMapHeight={lightMapHeight}
-      textureFilter={textureFilter}
-    >
-      <IrradianceSceneManager>
-        {(workbench, startWorkbench) => (
-          <>
-            <WorkManager>
-              {workbench && !isComplete && (
-                <IrradianceRenderer
-                  workbench={workbench}
-                  onComplete={() => {
-                    setIsComplete(true);
-                  }}
-                />
-              )}
-            </WorkManager>
+    const [isComplete, setIsComplete] = useState(false);
 
-            <IrradianceScene ref={sceneRef} onReady={startWorkbench}>
-              {children}
-            </IrradianceScene>
-          </>
-        )}
-      </IrradianceSceneManager>
+    return (
+      <IrradianceCompositor
+        lightMapWidth={lightMapWidth}
+        lightMapHeight={lightMapHeight}
+        textureFilter={textureFilter}
+      >
+        <IrradianceSceneManager
+          texelsPerUnit={
+            autoUV2 ? texelsPerUnit || DEFAULT_TEXELS_PER_UNIT : undefined
+          }
+        >
+          {(workbench, startWorkbench) => (
+            <>
+              <WorkManager>
+                {workbench && !isComplete && (
+                  <IrradianceRenderer
+                    workbench={workbench}
+                    onComplete={() => {
+                      setIsComplete(true);
+                    }}
+                  />
+                )}
+              </WorkManager>
 
-      {!isComplete && <LocalSuspender />}
-    </IrradianceCompositor>
-  );
-});
+              <IrradianceScene ref={sceneRef} onReady={startWorkbench}>
+                {children}
+              </IrradianceScene>
+            </>
+          )}
+        </IrradianceSceneManager>
+
+        {!isComplete && <LocalSuspender />}
+      </IrradianceCompositor>
+    );
+  }
+);
 
 export default Lightmap;

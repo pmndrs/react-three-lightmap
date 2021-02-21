@@ -1,11 +1,7 @@
-import React, { useRef, useMemo, useEffect, useContext } from 'react';
-import { useResource } from 'react-three-fiber';
 import * as THREE from 'three';
 
 /// <reference path="potpack.d.ts"/>
 import potpack, { PotPackItem } from 'potpack';
-
-import { useIrradianceMapSize } from './IrradianceCompositor';
 
 const tmpOrigin = new THREE.Vector3();
 const tmpU = new THREE.Vector3();
@@ -102,6 +98,28 @@ function guessOrthogonalOrigin(
   return minI;
 }
 
+// @todo support opt-in inside opt-out groups
+export const AUTO_UV2_OPT_OUT_FLAG = Symbol('auto-UV2 opt out flag');
+
+// based on traverse() in https://github.com/mrdoob/three.js/blob/dev/src/core/Object3D.js
+function traverseAutoUV2Items(
+  object: THREE.Object3D,
+  callback: (object: THREE.Object3D) => void
+) {
+  // skip everything inside opt-out wrappers
+  if (
+    Object.prototype.hasOwnProperty.call(object.userData, AUTO_UV2_OPT_OUT_FLAG)
+  ) {
+    return;
+  }
+
+  callback(object);
+
+  for (const childObject of object.children) {
+    traverseAutoUV2Items(childObject, callback);
+  }
+}
+
 interface AutoUVBox extends PotPackItem {
   uv2Attr: THREE.Float32BufferAttribute;
 
@@ -115,18 +133,22 @@ interface AutoUVBox extends PotPackItem {
 }
 
 export interface AutoUV2Settings {
-  texelSize: number;
+  texelsPerUnit: number;
 }
 
-function computeAutoUV2Layout(
+export function computeAutoUV2Layout(
   width: number,
   height: number,
-  meshList: THREE.Mesh[],
-  { texelSize }: AutoUV2Settings
+  scene: THREE.Scene,
+  { texelsPerUnit }: AutoUV2Settings
 ) {
   const layoutBoxes: AutoUVBox[] = [];
 
-  for (const mesh of meshList) {
+  traverseAutoUV2Items(scene, (mesh) => {
+    if (!(mesh instanceof THREE.Mesh)) {
+      return;
+    }
+
     const buffer = mesh.geometry;
 
     if (!(buffer instanceof THREE.BufferGeometry)) {
@@ -257,7 +279,7 @@ function computeAutoUV2Layout(
         existingBox.posLocalY.push(0); // filled later
       }
     }
-  }
+  });
 
   // fill in local coords and compute dimensions for layout boxes based on polygon point sets inside them
   for (const layoutBox of layoutBoxes) {
@@ -295,8 +317,8 @@ function computeAutoUV2Layout(
     }
 
     // texel box is aligned to texel grid
-    const boxWidthInTexels = Math.ceil(realWidth / texelSize);
-    const boxHeightInTexels = Math.ceil(realHeight / texelSize);
+    const boxWidthInTexels = Math.ceil(realWidth * texelsPerUnit);
+    const boxHeightInTexels = Math.ceil(realHeight * texelsPerUnit);
 
     // layout box positioning is in texels
     layoutBox.w = boxWidthInTexels + 2; // plus margins
@@ -338,113 +360,3 @@ function computeAutoUV2Layout(
     }
   }
 }
-
-interface AutoUV2Info {
-  completionPromise: Promise<void> | null;
-  register: Record<string, THREE.Mesh>;
-}
-const AutoUV2Context = React.createContext<AutoUV2Info | null>(null);
-
-export const AutoUV2Provider: React.FC<AutoUV2Settings> = ({
-  texelSize,
-  children
-}) => {
-  const [lightMapWidth, lightMapHeight] = useIrradianceMapSize();
-  const texelSizeRef = useRef(texelSize); // read only once
-
-  const resolverRef = useRef<(() => void) | null>(null);
-
-  const contextValue = useMemo<AutoUV2Info>(() => {
-    return {
-      completionPromise: new Promise<void>((resolve) => {
-        // stash resolver callback for later
-        resolverRef.current = resolve;
-      }),
-      register: {}
-    };
-  }, []);
-
-  useEffect(() => {
-    // perform layout in next tick
-    const timeoutId = setTimeout(() => {
-      computeAutoUV2Layout(
-        lightMapWidth,
-        lightMapHeight,
-        Object.values(contextValue.register),
-        { texelSize: texelSizeRef.current }
-      );
-
-      // clear waiting status in context object (so that suspenders return normally)
-      contextValue.completionPromise = null;
-
-      // notify everyone waiting (i.e. children)
-      if (!resolverRef.current) {
-        throw new Error('unexpected missing promise resolver');
-      }
-      resolverRef.current();
-    }, 0);
-
-    // always clean up timeout
-    return () => clearTimeout(timeoutId);
-  }, [lightMapWidth, lightMapHeight, contextValue]);
-
-  return (
-    <AutoUV2Context.Provider value={contextValue}>
-      {children}
-    </AutoUV2Context.Provider>
-  );
-};
-
-const Suspender: React.FC = () => {
-  const ctx = useContext(AutoUV2Context);
-  if (!ctx) {
-    throw new Error('no auto-UV context');
-  }
-
-  if (ctx.completionPromise) {
-    throw ctx.completionPromise;
-  }
-
-  return null;
-};
-
-export const AutoUV2: React.FC = () => {
-  const groupRef = useResource<THREE.Group>();
-  const mesh = groupRef.current && groupRef.current.parent;
-
-  // extra error checks
-  if (mesh) {
-    if (!(mesh instanceof THREE.Mesh)) {
-      throw new Error('light scene element should be a mesh');
-    }
-  }
-
-  const ctx = useContext(AutoUV2Context);
-  if (!ctx) {
-    throw new Error('no auto-UV context');
-  }
-
-  useEffect(() => {
-    if (!mesh) {
-      return;
-    }
-
-    const uuid = mesh.uuid; // freeze local reference
-
-    // register display item
-    ctx.register[uuid] = mesh;
-
-    // on unmount, clean up
-    return () => {
-      delete ctx.register[uuid];
-    };
-  }, [mesh]);
-
-  // placeholder to attach under the target mesh
-  // (suspension happens inside, so that this can be still rendered at all times)
-  return (
-    <group ref={groupRef}>
-      <Suspender />
-    </group>
-  );
-};
