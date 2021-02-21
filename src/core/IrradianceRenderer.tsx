@@ -3,7 +3,7 @@ import { useFrame } from 'react-three-fiber';
 import * as THREE from 'three';
 
 import { WorkManagerContext } from './WorkManager';
-import { Workbench, MAX_ITEM_FACES, AtlasMap } from './IrradianceAtlasMapper';
+import { Workbench, AtlasMap } from './IrradianceAtlasMapper';
 import {
   ProbeBatchRenderer,
   ProbeBatchReader,
@@ -53,22 +53,21 @@ function queueTexel(
   const texelInfoBase = texelIndex * 4;
   const texelPosU = atlasMap.data[texelInfoBase];
   const texelPosV = atlasMap.data[texelInfoBase + 1];
-  const texelFaceEnc = atlasMap.data[texelInfoBase + 2];
+  const texelItemEnc = atlasMap.data[texelInfoBase + 2];
+  const texelFaceEnc = atlasMap.data[texelInfoBase + 3];
 
   // skip computation if this texel is empty
-  if (texelFaceEnc === 0) {
+  if (texelItemEnc === 0) {
     return false;
   }
 
   // otherwise, proceed with computation and exit
-  const texelFaceIndexCombo = Math.round(texelFaceEnc - 1);
-  const texelFaceIndex = texelFaceIndexCombo % MAX_ITEM_FACES;
-  const texelItemIndex =
-    (texelFaceIndexCombo - texelFaceIndex) / MAX_ITEM_FACES;
+  const texelItemIndex = Math.round(texelItemEnc - 1);
+  const texelFaceIndex = Math.round(texelFaceEnc - 1);
 
   if (texelItemIndex < 0 || texelItemIndex >= atlasMap.items.length) {
     throw new Error(
-      `incorrect atlas map item data: ${texelPosU}, ${texelPosV}, ${texelFaceEnc}`
+      `incorrect atlas map item data: ${texelPosU}, ${texelPosV}, ${texelItemEnc}, ${texelFaceEnc}`
     );
   }
 
@@ -76,7 +75,7 @@ function queueTexel(
 
   if (texelFaceIndex < 0 || texelFaceIndex >= atlasItem.faceCount) {
     throw new Error(
-      `incorrect atlas map face data: ${texelPosU}, ${texelPosV}, ${texelFaceEnc}`
+      `incorrect atlas map face data: ${texelPosU}, ${texelPosV}, ${texelItemEnc}, ${texelFaceEnc}`
     );
   }
 

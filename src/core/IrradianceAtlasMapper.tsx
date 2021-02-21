@@ -30,19 +30,18 @@ export interface Workbench {
   irradianceData: Float32Array;
 }
 
-export const MAX_ITEM_FACES = 1000; // used for encoding item+face index in texture
-
-// can be arbitrary colour (empty pixels are ignored due to zero alpha)
+// must be black for full zeroing
 const ATLAS_BG_COLOR = new THREE.Color('#000000');
 
 const VERTEX_SHADER = `
+  attribute vec4 faceInfo;
   attribute vec2 uv2;
 
-  varying vec3 vFacePos;
+  varying vec4 vFaceInfo;
   uniform vec2 uvOffset;
 
   void main() {
-    vFacePos = position;
+    vFaceInfo = faceInfo;
 
     gl_Position = projectionMatrix * vec4(
       uv2 + uvOffset, // UV2 is the actual position on map
@@ -53,11 +52,11 @@ const VERTEX_SHADER = `
 `;
 
 const FRAGMENT_SHADER = `
-  varying vec3 vFacePos;
+  varying vec4 vFaceInfo;
 
   void main() {
     // encode the face information in map
-    gl_FragColor = vec4(vFacePos.xyz, 1.0);
+    gl_FragColor = vFaceInfo;
   }
 `;
 
@@ -154,7 +153,11 @@ const IrradianceAtlasMapper: React.FC<{
       // index of this item once it will be added to list
       const itemIndex = items.length;
 
-      const atlasUVAttr = new THREE.Float32BufferAttribute(
+      const atlasPosAttr = new THREE.Float32BufferAttribute(
+        faceVertexCount * 3,
+        3
+      );
+      const atlasUV2Attr = new THREE.Float32BufferAttribute(
         faceVertexCount * 2,
         2
       );
@@ -162,9 +165,9 @@ const IrradianceAtlasMapper: React.FC<{
         faceVertexCount * 3,
         3
       );
-      const atlasFacePosAttr = new THREE.Float32BufferAttribute(
-        faceVertexCount * 3,
-        3
+      const atlasFaceInfoAttr = new THREE.Float32BufferAttribute(
+        faceVertexCount * 4,
+        4
       );
 
       // unroll indexed mesh data into non-indexed buffer so that we can encode per-face data
@@ -177,7 +180,9 @@ const IrradianceAtlasMapper: React.FC<{
       ) {
         const faceMod = faceVertexIndex % 3;
 
-        atlasUVAttr.copyAt(
+        // not bothering to copy vertex position data because we don't need it
+        // (however, we cannot omit the 'position' attribute altogether)
+        atlasUV2Attr.copyAt(
           faceVertexIndex,
           uv2Attr,
           indexData[faceVertexIndex]
@@ -196,19 +201,21 @@ const IrradianceAtlasMapper: React.FC<{
         // mesh index + face index combined into one
         const faceIndex = (faceVertexIndex - faceMod) / 3;
 
-        atlasFacePosAttr.setXYZ(
+        atlasFaceInfoAttr.setXYZW(
           faceVertexIndex,
           facePosX,
           facePosY,
-          itemIndex * MAX_ITEM_FACES + faceIndex + 1 // encode face info in texel
+          itemIndex + 1, // encode item index (1-based to indicate filled texels)
+          faceIndex + 1 // encode face index (1-based to indicate filled texels)
         );
       }
 
       // this buffer is disposed of when atlas scene is unmounted
       const atlasBuffer = new THREE.BufferGeometry();
-      atlasBuffer.setAttribute('position', atlasFacePosAttr);
-      atlasBuffer.setAttribute('uv2', atlasUVAttr);
+      atlasBuffer.setAttribute('position', atlasPosAttr);
+      atlasBuffer.setAttribute('uv2', atlasUV2Attr);
       atlasBuffer.setAttribute('normal', atlasNormalAttr);
+      atlasBuffer.setAttribute('faceInfo', atlasFaceInfoAttr);
 
       items.push({
         faceCount: faceVertexCount / 3,
