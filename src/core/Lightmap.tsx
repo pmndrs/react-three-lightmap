@@ -14,6 +14,7 @@ import IrradianceCompositor from './IrradianceCompositor';
 import IrradianceScene from './IrradianceScene';
 
 const DEFAULT_LIGHTMAP_SIZE = 64;
+const DEFAULT_TEXELS_PER_UNIT = 2;
 
 export const AutoUV2Ignore: React.FC = ({ children }) => {
   return (
@@ -68,7 +69,9 @@ const Lightmap = React.forwardRef<
         textureFilter={textureFilter}
       >
         <IrradianceSceneManager
-          texelsPerUnit={autoUV2 ? texelsPerUnit || 2 : undefined}
+          texelsPerUnit={
+            autoUV2 ? texelsPerUnit || DEFAULT_TEXELS_PER_UNIT : undefined
+          }
         >
           {(workbench, startWorkbench) => (
             <>
