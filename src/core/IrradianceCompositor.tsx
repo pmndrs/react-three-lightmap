@@ -1,5 +1,4 @@
-import React, { useState, useMemo, useEffect, useContext, useRef } from 'react';
-import { useFrame } from 'react-three-fiber';
+import React, { useMemo, useEffect, useContext, useRef } from 'react';
 import * as THREE from 'three';
 
 const IrradianceRendererContext = React.createContext<{
@@ -46,10 +45,6 @@ export function useIrradianceTexture(): THREE.Texture {
   return texture;
 }
 
-const LIGHTMAP_BG_COLOR = new THREE.Color('#000000'); // blank must be all zeroes (as one would expect)
-
-const tmpPrevClearColor = new THREE.Color();
-
 function createRendererTexture(
   atlasWidth: number,
   atlasHeight: number,
@@ -75,54 +70,6 @@ function createRendererTexture(
   return [texture, data];
 }
 
-const CompositorLayerMaterial: React.FC<{
-  map: THREE.Texture;
-  materialRef: React.MutableRefObject<THREE.ShaderMaterial | null>;
-}> = ({ map, materialRef }) => {
-  const material = useMemo(
-    () =>
-      new THREE.ShaderMaterial({
-        uniforms: {
-          map: { value: null },
-          multiplier: { value: 0 }
-        },
-
-        vertexShader: `
-          varying vec2 vUV;
-
-          void main() {
-            vUV = uv;
-
-            vec4 worldPosition = modelMatrix * vec4( position, 1.0 );
-            gl_Position = projectionMatrix * modelViewMatrix * vec4( position, 1.0 );
-          }
-        `,
-        fragmentShader: `
-          uniform sampler2D map;
-          uniform float multiplier;
-          varying vec2 vUV;
-
-          void main() {
-            gl_FragColor = vec4(texture2D(map, vUV).rgb * multiplier, 1.0);
-          }
-        `,
-
-        blending: THREE.AdditiveBlending
-      }),
-    []
-  );
-
-  // disposable managed object
-  return (
-    <primitive
-      object={material}
-      attach="material"
-      uniforms-map-value={map}
-      ref={materialRef}
-    />
-  );
-};
-
 export type LightMapConsumerChild = (
   outputLightMap: THREE.Texture
 ) => React.ReactNode;
@@ -145,8 +92,6 @@ export default function IrradianceCompositor({
   const widthRef = useRef(lightMapWidth);
   const heightRef = useRef(lightMapHeight);
   const textureFilterRef = useRef(textureFilter);
-
-  const orthoSceneRef = useRef<THREE.Scene>();
 
   // incoming base rendered texture (filled elsewhere)
   const [baseTexture, baseArray] = useMemo(

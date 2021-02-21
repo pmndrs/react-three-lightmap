@@ -1,11 +1,4 @@
-import React, {
-  useState,
-  useEffect,
-  useMemo,
-  useCallback,
-  useContext,
-  useRef
-} from 'react';
+import React, { useState, useMemo, useCallback, useRef } from 'react';
 import * as THREE from 'three';
 
 import {
