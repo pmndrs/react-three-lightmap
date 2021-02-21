@@ -4,7 +4,7 @@
   "description": "In-browser lightmap baker for react-three-fiber and ThreeJS",
   "private": true,
   "main": "dist/index.js",
-  "module": "dist/react-three-lightmap.esm.js",
+  "module": "dist/lightmap.esm.js",
   "typings": "dist/index.d.ts",
   "files": [
     "dist"
@@ -69,11 +69,11 @@
   },
   "size-limit": [
     {
-      "path": "dist/react-three-lightmap.cjs.production.min.js",
+      "path": "dist/lightmap.cjs.production.min.js",
       "limit": "10 KB"
     },
     {
-      "path": "dist/react-three-lightmap.esm.js",
+      "path": "dist/lightmap.esm.js",
       "limit": "10 KB"
     }
   ]
