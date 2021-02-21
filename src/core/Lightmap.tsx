@@ -7,6 +7,7 @@ import React, { useState, useMemo } from 'react';
 import * as THREE from 'three';
 
 import { AUTO_UV2_OPT_OUT_FLAG } from './AutoUV2';
+import { ATLAS_OPT_OUT_FLAG } from './IrradianceAtlasMapper';
 import IrradianceSceneManager from './IrradianceSceneManager';
 import WorkManager from './WorkManager';
 import IrradianceRenderer from './IrradianceRenderer';
@@ -22,6 +23,20 @@ export const AutoUV2Ignore: React.FC = ({ children }) => {
       name="Auto-UV2 opt out wrapper"
       userData={{
         [AUTO_UV2_OPT_OUT_FLAG]: true
+      }}
+    >
+      {children}
+    </group>
+  );
+};
+
+export const LightmapIgnore: React.FC = ({ children }) => {
+  return (
+    <group
+      name="Lightmap opt out wrapper"
+      userData={{
+        [AUTO_UV2_OPT_OUT_FLAG]: true, // no need for auto-UV2 if ignored during baking
+        [ATLAS_OPT_OUT_FLAG]: true
       }}
     >
       {children}

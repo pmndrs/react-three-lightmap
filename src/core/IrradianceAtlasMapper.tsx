@@ -57,6 +57,28 @@ const FRAGMENT_SHADER = `
   }
 `;
 
+// @todo support opt-in inside opt-out groups
+export const ATLAS_OPT_OUT_FLAG = Symbol('lightmap atlas opt out flag');
+
+// based on traverse() in https://github.com/mrdoob/three.js/blob/dev/src/core/Object3D.js
+function traverseAtlasItems(
+  object: THREE.Object3D,
+  callback: (object: THREE.Object3D) => void
+) {
+  // skip everything inside opt-out wrappers
+  if (
+    Object.prototype.hasOwnProperty.call(object.userData, ATLAS_OPT_OUT_FLAG)
+  ) {
+    return;
+  }
+
+  callback(object);
+
+  for (const childObject of object.children) {
+    traverseAtlasItems(childObject, callback);
+  }
+}
+
 // write out original face geometry info into the atlas map
 // each texel corresponds to: (quadX, quadY, quadIndex)
 // where quadX and quadY are 0..1 representing a spot in the original quad
@@ -89,7 +111,7 @@ const IrradianceAtlasMapper: React.FC<{
   useEffect(() => {
     const items = [] as AtlasMapInternalItem[];
 
-    lightSceneRef.current.traverse((mesh) => {
+    traverseAtlasItems(lightSceneRef.current, (mesh) => {
       if (!(mesh instanceof THREE.Mesh)) {
         return;
       }
