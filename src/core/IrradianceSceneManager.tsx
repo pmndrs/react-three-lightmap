@@ -66,9 +66,14 @@ const IrradianceSceneManager: React.FC<{
     // perform UV auto-layout in next tick
     const timeoutId = setTimeout(() => {
       if (texelsPerUnitRef.current) {
-        computeAutoUV2Layout(lightMapWidth, lightMapHeight, scene, {
-          texelsPerUnit: texelsPerUnitRef.current
-        });
+        computeAutoUV2Layout(
+          lightMapWidthRef.current,
+          lightMapHeightRef.current,
+          scene,
+          {
+            texelsPerUnit: texelsPerUnitRef.current
+          }
+        );
       }
 
       // mark as done
