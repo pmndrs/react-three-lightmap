@@ -29,7 +29,7 @@ export const Main: Story = () => (
   >
     <DebugOverlayRenderer>
       <React.Suspense fallback={<Spinner />}>
-        <Lightmap>
+        <Lightmap autoUV2 texelsPerUnit={4}>
           <AutoUV2Provider texelsPerUnit={4}>
             <mesh position={[0, 0, -2]} receiveShadow>
               <planeBufferGeometry attach="geometry" args={[20, 20]} />

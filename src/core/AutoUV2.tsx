@@ -118,15 +118,19 @@ export interface AutoUV2Settings {
   texelsPerUnit: number;
 }
 
-function computeAutoUV2Layout(
+export function computeAutoUV2Layout(
   width: number,
   height: number,
-  meshList: THREE.Mesh[],
+  scene: THREE.Scene,
   { texelsPerUnit }: AutoUV2Settings
 ) {
   const layoutBoxes: AutoUVBox[] = [];
 
-  for (const mesh of meshList) {
+  scene.traverse((mesh) => {
+    if (!(mesh instanceof THREE.Mesh)) {
+      return;
+    }
+
     const buffer = mesh.geometry;
 
     if (!(buffer instanceof THREE.BufferGeometry)) {
@@ -257,7 +261,7 @@ function computeAutoUV2Layout(
         existingBox.posLocalY.push(0); // filled later
       }
     }
-  }
+  });
 
   // fill in local coords and compute dimensions for layout boxes based on polygon point sets inside them
   for (const layoutBox of layoutBoxes) {
@@ -345,12 +349,8 @@ interface AutoUV2Info {
 }
 const AutoUV2Context = React.createContext<AutoUV2Info | null>(null);
 
-export const AutoUV2Provider: React.FC<AutoUV2Settings> = ({
-  texelsPerUnit,
-  children
-}) => {
+export const AutoUV2Provider: React.FC<AutoUV2Settings> = ({ children }) => {
   const [lightMapWidth, lightMapHeight] = useIrradianceMapSize();
-  const texelsPerUnitRef = useRef(texelsPerUnit); // read only once
 
   const resolverRef = useRef<(() => void) | null>(null);
 
@@ -367,12 +367,12 @@ export const AutoUV2Provider: React.FC<AutoUV2Settings> = ({
   useEffect(() => {
     // perform layout in next tick
     const timeoutId = setTimeout(() => {
-      computeAutoUV2Layout(
-        lightMapWidth,
-        lightMapHeight,
-        Object.values(contextValue.register),
-        { texelsPerUnit: texelsPerUnitRef.current }
-      );
+      // computeAutoUV2Layout(
+      //   lightMapWidth,
+      //   lightMapHeight,
+      //   Object.values(contextValue.register),
+      //   { texelsPerUnit: texelsPerUnitRef.current }
+      // );
 
       // clear waiting status in context object (so that suspenders return normally)
       contextValue.completionPromise = null;
