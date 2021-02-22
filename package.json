@@ -13,14 +13,7 @@
     "node": ">=10"
   },
   "dependencies": {
-    "@types/react": "^17.0.2",
-    "@types/react-dom": "^17.0.1",
-    "potpack": "^1.0.1",
-    "react": "^17.0.1",
-    "react-dom": "^17.0.1",
-    "react-three-fiber": "^5.3.1",
-    "three": "^0.125.0",
-    "typescript": "^4.1.5"
+    "potpack": "^1.0.1"
   },
   "scripts": {
     "start": "tsdx watch --entry src/entry.ts",
@@ -50,12 +43,19 @@
     "@storybook/addon-links": "^6.1.18",
     "@storybook/addons": "^6.1.18",
     "@storybook/react": "^6.1.18",
+    "@types/react": "^17.0.2",
+    "@types/react-dom": "^17.0.1",
     "babel-loader": "^8.2.2",
     "husky": "^5.0.9",
+    "react": "^17.0.1",
+    "react-dom": "^17.0.1",
     "react-is": "^17.0.1",
+    "react-three-fiber": "^5.3.1",
     "size-limit": "^4.9.2",
+    "three": "^0.125.0",
     "tsdx": "^0.14.1",
-    "tslib": "^2.1.0"
+    "tslib": "^2.1.0",
+    "typescript": "^4.1.5"
   },
   "peerDependencies": {
     "react": ">=16",
