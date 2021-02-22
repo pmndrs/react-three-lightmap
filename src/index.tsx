@@ -37,7 +37,7 @@ ReactDOM.render(
     }}
   >
     <React.Suspense fallback={<Spinner />}>
-      <Lightmap autoUV2>
+      <Lightmap>
         <mesh position={[0, 0, -0.1]} receiveShadow>
           <planeBufferGeometry attach="geometry" args={[9, 5]} />
           <meshLambertMaterial attach="material" color="#ffffff" />

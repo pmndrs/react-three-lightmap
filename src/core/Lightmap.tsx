@@ -13,8 +13,6 @@ import WorkManager from './WorkManager';
 import IrradianceRenderer from './IrradianceRenderer';
 import IrradianceScene from './IrradianceScene';
 
-const DEFAULT_TEXELS_PER_UNIT = 2;
-
 // prevent automatic generation of UV2 coordinates for content
 // (but still allow contribution to lightmap, for e.g. emissive objects, large occluders, etc)
 export const AutoUV2Ignore: React.FC = ({ children }) => {
@@ -54,7 +52,6 @@ export const LightmapIgnore: React.FC = ({ children }) => {
 export interface LightmapProps {
   lightMapSize?: number | [number, number];
   textureFilter?: THREE.TextureFilter;
-  autoUV2?: boolean;
   texelsPerUnit?: number;
 }
 
@@ -67,57 +64,50 @@ const LocalSuspender: React.FC = () => {
 const Lightmap = React.forwardRef<
   THREE.Scene,
   React.PropsWithChildren<LightmapProps>
->(
-  (
-    { lightMapSize, textureFilter, autoUV2, texelsPerUnit, children },
-    sceneRef
-  ) => {
-    // parse the convenience setting
-    const [[initialWidth, initialHeight]] = useState(() =>
-      lightMapSize
-        ? [
-            typeof lightMapSize === 'number' ? lightMapSize : lightMapSize[0],
-            typeof lightMapSize === 'number' ? lightMapSize : lightMapSize[1]
-          ]
-        : [undefined, undefined]
-    );
+>(({ lightMapSize, textureFilter, texelsPerUnit, children }, sceneRef) => {
+  // parse the convenience setting
+  const [[initialWidth, initialHeight]] = useState(() =>
+    lightMapSize
+      ? [
+          typeof lightMapSize === 'number' ? lightMapSize : lightMapSize[0],
+          typeof lightMapSize === 'number' ? lightMapSize : lightMapSize[1]
+        ]
+      : [undefined, undefined]
+  );
 
-    const [isComplete, setIsComplete] = useState(false);
+  const [isComplete, setIsComplete] = useState(false);
 
-    return (
-      <>
-        <IrradianceSceneManager
-          initialWidth={initialWidth}
-          initialHeight={initialHeight}
-          textureFilter={textureFilter}
-          texelsPerUnit={
-            autoUV2 ? texelsPerUnit || DEFAULT_TEXELS_PER_UNIT : undefined
-          }
-        >
-          {(workbench, startWorkbench) => (
-            <LightmapProgressContext.Provider value={!isComplete}>
-              <WorkManager>
-                {workbench && !isComplete && (
-                  <IrradianceRenderer
-                    workbench={workbench}
-                    onComplete={() => {
-                      setIsComplete(true);
-                    }}
-                  />
-                )}
-              </WorkManager>
+  return (
+    <>
+      <IrradianceSceneManager
+        initialWidth={initialWidth}
+        initialHeight={initialHeight}
+        textureFilter={textureFilter}
+        texelsPerUnit={texelsPerUnit}
+      >
+        {(workbench, startWorkbench) => (
+          <LightmapProgressContext.Provider value={!isComplete}>
+            <WorkManager>
+              {workbench && !isComplete && (
+                <IrradianceRenderer
+                  workbench={workbench}
+                  onComplete={() => {
+                    setIsComplete(true);
+                  }}
+                />
+              )}
+            </WorkManager>
 
-              <IrradianceScene ref={sceneRef} onReady={startWorkbench}>
-                {children}
-              </IrradianceScene>
-            </LightmapProgressContext.Provider>
-          )}
-        </IrradianceSceneManager>
+            <IrradianceScene ref={sceneRef} onReady={startWorkbench}>
+              {children}
+            </IrradianceScene>
+          </LightmapProgressContext.Provider>
+        )}
+      </IrradianceSceneManager>
 
-        {!isComplete && <LocalSuspender />}
-      </>
-    );
-  }
-);
+      {!isComplete && <LocalSuspender />}
+    </>
+  );
+});
 
 export default Lightmap;
