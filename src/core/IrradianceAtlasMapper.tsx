@@ -288,7 +288,7 @@ const IrradianceAtlasMapper: React.FC<{
 
       // save existing renderer state
       const prevClearColor = new THREE.Color();
-      prevClearColor.copy(gl.getClearColor());
+      gl.getClearColor(prevClearColor);
       const prevClearAlpha = gl.getClearAlpha();
       const prevAutoClear = gl.autoClear;
 
