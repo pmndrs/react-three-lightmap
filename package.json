@@ -37,6 +37,7 @@
   },
   "devDependencies": {
     "@babel/core": "^7.12.17",
+    "@react-three/drei": "^3.8.6",
     "@size-limit/preset-small-lib": "^4.9.2",
     "@storybook/addon-essentials": "^6.1.18",
     "@storybook/addon-info": "^5.3.21",

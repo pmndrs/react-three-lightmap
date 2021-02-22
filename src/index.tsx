@@ -8,11 +8,11 @@
 import React from 'react';
 import ReactDOM from 'react-dom';
 import { Canvas, useLoader } from 'react-three-fiber';
+import { OrbitControls } from '@react-three/drei';
 import * as THREE from 'three';
 
 import Lightmap from './core/Lightmap';
 import Spinner from './stories/Spinner';
-import DebugControls from './stories/DebugControls';
 
 import './stories/viewport.css';
 
@@ -71,7 +71,12 @@ ReactDOM.render(
       <Scene />
     </React.Suspense>
 
-    <DebugControls />
+    <OrbitControls
+      enableDamping
+      dampingFactor={0.1}
+      rotateSpeed={0.5}
+      target={new THREE.Vector3(0, 0, 1)}
+    />
   </Canvas>,
   document.getElementById('root')
 );

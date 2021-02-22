@@ -1,12 +1,12 @@
 import React, { useMemo } from 'react';
 import { Story, Meta } from '@storybook/react';
 import { useLoader, Canvas } from 'react-three-fiber';
+import { OrbitControls } from '@react-three/drei';
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader';
 
 import Lightmap, { AutoUV2Ignore } from '../core/Lightmap';
 import Spinner from './Spinner';
-import DebugControls from './DebugControls';
 import { DebugOverlayRenderer, DebugOverlayWidgets } from './DebugOverlayScene';
 
 import './viewport.css';
@@ -152,6 +152,11 @@ export const Main: Story = () => (
       </React.Suspense>
     </DebugOverlayRenderer>
 
-    <DebugControls />
+    <OrbitControls
+      enableDamping
+      dampingFactor={0.1}
+      rotateSpeed={0.5}
+      target={new THREE.Vector3(0, 0, 1)}
+    />
   </Canvas>
 );
