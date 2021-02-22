@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React from 'react';
 import { Story, Meta } from '@storybook/react';
 import { Canvas } from 'react-three-fiber';
 import * as THREE from 'three';
@@ -17,12 +17,6 @@ export default {
   title: 'Text mesh scene'
 } as Meta;
 
-const FontLoader: React.FC = () => {
-  useEffect(() => {}, []);
-
-  return null;
-};
-
 export const Main: Story = () => (
   <Canvas
     colorManagement={false} // @todo reconsider
@@ -35,11 +29,9 @@ export const Main: Story = () => (
       gl.outputEncoding = THREE.sRGBEncoding;
     }}
   >
-    <FontLoader />
-
     <DebugOverlayRenderer>
       <React.Suspense fallback={<Spinner />}>
-        <Lightmap autoUV2 texelsPerUnit={4}>
+        <Lightmap texelsPerUnit={4}>
           <AutoUV2Ignore>
             <mesh position={[0, 0, -2]} receiveShadow>
               <planeBufferGeometry attach="geometry" args={[20, 20]} />
