@@ -7,21 +7,20 @@
 
 import React from 'react';
 import ReactDOM from 'react-dom';
-import { Canvas, useLoader } from 'react-three-fiber';
+import { Canvas, useLoader, useResource, useFrame } from 'react-three-fiber';
 import { OrbitControls } from '@react-three/drei';
 import * as THREE from 'three';
 
-import Lightmap from './core/Lightmap';
-import Spinner from './stories/Spinner';
+import Lightmap from '../src/core/Lightmap'; // @todo correct import
 
-import './stories/viewport.css';
+import './index.css';
 
 /**
  * Try changing this!
  */
 const DISPLAY_TEXT = 'Light!';
 
-const Scene: React.FC = () => {
+const Scene = () => {
   const font = useLoader(
     THREE.FontLoader,
     'https://raw.githubusercontent.com/mrdoob/three.js/dev/examples/fonts/helvetiker_regular.typeface.json'
@@ -52,6 +51,34 @@ const Scene: React.FC = () => {
 
       <directionalLight intensity={1.5} position={[-2, 2, 4]} castShadow />
     </Lightmap>
+  );
+};
+
+const Spinner = () => {
+  const meshRef = useResource();
+
+  useFrame(({ clock }) => {
+    // @todo meshRef.current can be undefined on unmount, fix upstream
+    if (meshRef.current && meshRef.current.rotation.isEuler) {
+      meshRef.current.rotation.x = Math.sin(clock.elapsedTime * 0.2);
+      meshRef.current.rotation.y = Math.sin(clock.elapsedTime * 0.5);
+      meshRef.current.rotation.z = Math.sin(clock.elapsedTime);
+
+      const initialZoom = Math.sin(Math.min(clock.elapsedTime, Math.PI / 2));
+      meshRef.current.scale.x = meshRef.current.scale.y = meshRef.current.scale.z =
+        (1 + 0.2 * Math.sin(clock.elapsedTime * 1.5)) * initialZoom;
+    }
+  });
+
+  return (
+    <>
+      <pointLight position={[-4, 4, 8]} />
+
+      <mesh ref={meshRef}>
+        <dodecahedronGeometry args={[2]} />
+        <meshLambertMaterial color="#808080" />
+      </mesh>
+    </>
   );
 };
 
