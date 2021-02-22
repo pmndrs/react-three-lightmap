@@ -7,7 +7,7 @@
 
 import React from 'react';
 import ReactDOM from 'react-dom';
-import { Canvas } from 'react-three-fiber';
+import { Canvas, useLoader } from 'react-three-fiber';
 import * as THREE from 'three';
 
 import Lightmap from './core/Lightmap';
@@ -16,13 +16,44 @@ import DebugControls from './stories/DebugControls';
 
 import './stories/viewport.css';
 
-import helvetikerFontData from './stories/helvetiker.json';
-const helvetikerFont = new THREE.Font(helvetikerFontData);
-
 /**
  * Try changing this!
  */
 const DISPLAY_TEXT = 'Light!';
+
+const Scene: React.FC = () => {
+  const font = useLoader(
+    THREE.FontLoader,
+    'https://raw.githubusercontent.com/mrdoob/three.js/dev/examples/fonts/helvetiker_regular.typeface.json'
+  );
+
+  return (
+    <Lightmap>
+      <mesh position={[0, 0, -0.1]} receiveShadow>
+        <planeBufferGeometry attach="geometry" args={[9, 5]} />
+        <meshLambertMaterial attach="material" color="#ffffff" />
+      </mesh>
+
+      <mesh position={[-3.2, -0.8, 0]} castShadow receiveShadow>
+        <textBufferGeometry
+          attach="geometry"
+          args={[
+            DISPLAY_TEXT,
+            {
+              font,
+              size: 2,
+              height: 1.5,
+              curveSegments: 1
+            }
+          ]}
+        />
+        <meshLambertMaterial attach="material" color="#ffe020" />
+      </mesh>
+
+      <directionalLight intensity={1.5} position={[-2, 2, 4]} castShadow />
+    </Lightmap>
+  );
+};
 
 ReactDOM.render(
   <Canvas
@@ -37,30 +68,7 @@ ReactDOM.render(
     }}
   >
     <React.Suspense fallback={<Spinner />}>
-      <Lightmap>
-        <mesh position={[0, 0, -0.1]} receiveShadow>
-          <planeBufferGeometry attach="geometry" args={[9, 5]} />
-          <meshLambertMaterial attach="material" color="#ffffff" />
-        </mesh>
-
-        <mesh position={[-3.2, -0.8, 0]} castShadow receiveShadow>
-          <textBufferGeometry
-            attach="geometry"
-            args={[
-              DISPLAY_TEXT,
-              {
-                font: helvetikerFont,
-                size: 2,
-                height: 1.5,
-                curveSegments: 1
-              }
-            ]}
-          />
-          <meshLambertMaterial attach="material" color="#ffe020" />
-        </mesh>
-
-        <directionalLight intensity={1.5} position={[-2, 2, 4]} castShadow />
-      </Lightmap>
+      <Scene />
     </React.Suspense>
 
     <DebugControls />
