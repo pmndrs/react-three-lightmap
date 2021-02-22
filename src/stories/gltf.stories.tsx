@@ -4,7 +4,7 @@ import { useLoader, Canvas } from 'react-three-fiber';
 import * as THREE from 'three';
 import { GLTFLoader, GLTF } from 'three/examples/jsm/loaders/GLTFLoader';
 
-import Lightmap from '../core/Lightmap';
+import Lightmap, { AutoUV2Ignore } from '../core/Lightmap';
 import Spinner from './Spinner';
 import DebugControls from './DebugControls';
 import { DebugOverlayRenderer, DebugOverlayWidgets } from './DebugOverlayScene';
@@ -102,7 +102,7 @@ const MainSceneContents: React.FC = () => {
   const coverMesh = loadedMeshList.find((item) => item.name === 'Cover');
 
   return (
-    <>
+    <AutoUV2Ignore>
       <mesh position={[0, 0, -5]}>
         <planeBufferGeometry attach="geometry" args={[200, 200]} />
         <meshBasicMaterial attach="material" color="#171717" />
@@ -126,7 +126,7 @@ const MainSceneContents: React.FC = () => {
         penumbra={0.25}
         intensity={0.5}
       />
-    </>
+    </AutoUV2Ignore>
   );
 };
 

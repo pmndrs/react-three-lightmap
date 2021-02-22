@@ -4,7 +4,7 @@ import { useLoader, Canvas } from 'react-three-fiber';
 import * as THREE from 'three';
 import { GLTFLoader, GLTF } from 'three/examples/jsm/loaders/GLTFLoader';
 
-import Lightmap from '../core/Lightmap';
+import Lightmap, { AutoUV2Ignore } from '../core/Lightmap';
 import Spinner from './Spinner';
 import DebugControls from './DebugControls';
 import { DebugOverlayRenderer, DebugOverlayWidgets } from './DebugOverlayScene';
@@ -59,7 +59,7 @@ const MainSceneContents: React.FC = () => {
   }, [loadedData]);
 
   return (
-    <>
+    <AutoUV2Ignore>
       <mesh position={[0, 0, -2]} receiveShadow>
         <planeBufferGeometry attach="geometry" args={[20, 20]} />
         <meshLambertMaterial
@@ -72,7 +72,7 @@ const MainSceneContents: React.FC = () => {
       {loadedMeshList.map((mesh) => (
         <primitive key={mesh.uuid} object={mesh} dispose={null} />
       ))}
-    </>
+    </AutoUV2Ignore>
   );
 };
 

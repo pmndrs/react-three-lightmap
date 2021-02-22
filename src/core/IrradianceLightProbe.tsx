@@ -195,7 +195,7 @@ export function useLightProbe(
     batchResultCallback
   ) {
     // save existing renderer state
-    tmpPrevClearColor.copy(gl.getClearColor());
+    gl.getClearColor(tmpPrevClearColor);
     const prevClearAlpha = gl.getClearAlpha();
     const prevAutoClear = gl.autoClear;
     const prevToneMapping = gl.toneMapping;

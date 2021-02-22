@@ -158,6 +158,7 @@ export function computeAutoUV2Layout(
   { texelsPerUnit }: AutoUV2Settings
 ): [number, number] {
   const layoutBoxes: AutoUVBox[] = [];
+  let hasPredefinedUV2 = false;
 
   traverseAutoUV2Items(scene, (mesh) => {
     if (!(mesh instanceof THREE.Mesh)) {
@@ -190,8 +191,23 @@ export function computeAutoUV2Layout(
       posArray.length / 3
     );
 
+    // complain if found predefined UV2 in a scene with computed UV2
     if (buffer.attributes.uv2) {
-      throw new Error('uv2 attribute already exists');
+      if (layoutBoxes.length > 0) {
+        throw new Error(
+          'found a mesh with "uv2" attribute in a scene with auto-calculated UV2 data: please do not mix-and-match'
+        );
+      }
+
+      hasPredefinedUV2 = true;
+      return;
+    }
+
+    // complain if trying to compute UV2 in a scene with predefined UV2
+    if (hasPredefinedUV2) {
+      throw new Error(
+        'found a mesh with missing "uv2" attribute in a scene with predefined UV2 data: please do not mix-and-match'
+      );
     }
 
     // pre-create uv2 attribute
@@ -344,6 +360,11 @@ export function computeAutoUV2Layout(
       posLocalX[i] = (posLocalX[i] - tmpMinLocal.x) / realWidth;
       posLocalY[i] = (posLocalY[i] - tmpMinLocal.y) / realHeight;
     }
+  }
+
+  // bail out if no layout is necessary
+  if (layoutBoxes.length === 0) {
+    return [initialWidth || 0, initialHeight || 0]; // report preferred size if given
   }
 
   // main layout magic

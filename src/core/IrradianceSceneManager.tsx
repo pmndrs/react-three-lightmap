@@ -19,6 +19,7 @@ export const IrradianceDebugContext = React.createContext<{
 } | null>(null);
 
 const DEFAULT_LIGHTMAP_SIZE = 64;
+const DEFAULT_TEXELS_PER_UNIT = 2;
 
 function createRendererTexture(
   atlasWidth: number,
@@ -98,23 +99,19 @@ const IrradianceSceneManager: React.FC<{
 
     // perform UV auto-layout in next tick
     const timeoutId = setTimeout(() => {
-      if (texelsPerUnitRef.current) {
-        const [lightMapWidth, lightMapHeight] = computeAutoUV2Layout(
-          initialWidthRef.current,
-          initialHeightRef.current,
-          scene,
-          {
-            texelsPerUnit: texelsPerUnitRef.current
-          }
-        );
+      const [computedWidth, computedHeight] = computeAutoUV2Layout(
+        initialWidthRef.current,
+        initialHeightRef.current,
+        scene,
+        {
+          texelsPerUnit: texelsPerUnitRef.current || DEFAULT_TEXELS_PER_UNIT
+        }
+      );
 
-        setDimensions({ lightMapWidth, lightMapHeight });
-      } else {
-        setDimensions({
-          lightMapWidth: initialWidthRef.current || DEFAULT_LIGHTMAP_SIZE,
-          lightMapHeight: initialHeightRef.current || DEFAULT_LIGHTMAP_SIZE
-        });
-      }
+      setDimensions({
+        lightMapWidth: computedWidth || DEFAULT_LIGHTMAP_SIZE,
+        lightMapHeight: computedHeight || DEFAULT_LIGHTMAP_SIZE
+      });
     }, 0);
 
     // always clean up timeout
