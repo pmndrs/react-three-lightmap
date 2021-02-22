@@ -1,17 +1,18 @@
 import React from 'react';
 import { Story, Meta } from '@storybook/react';
 import { Canvas } from 'react-three-fiber';
+import { OrbitControls } from '@react-three/drei';
 import * as THREE from 'three';
 
 import Lightmap, { AutoUV2Ignore } from '../core/Lightmap';
 import Spinner from './Spinner';
-import DebugControls from './DebugControls';
 import { DebugOverlayRenderer, DebugOverlayWidgets } from './DebugOverlayScene';
 
-import './viewport.css';
-
 export default {
-  title: 'Cylinder scene (polygon UV)'
+  title: 'Cylinder scene (polygon UV)',
+  parameters: {
+    layout: 'fullscreen'
+  }
 } as Meta;
 
 export const Main: Story = () => (
@@ -52,6 +53,11 @@ export const Main: Story = () => (
       </React.Suspense>
     </DebugOverlayRenderer>
 
-    <DebugControls />
+    <OrbitControls
+      enableDamping
+      dampingFactor={0.1}
+      rotateSpeed={0.5}
+      target={new THREE.Vector3(0, 0, 1)}
+    />
   </Canvas>
 );

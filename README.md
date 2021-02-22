@@ -4,7 +4,7 @@
 
 ![example screenshot of lightmap baker output](./react-three-lightmap-example.png)
 
-[Live editable sandbox](https://codesandbox.io/s/github/pmndrs/react-three-lightmap).
+[Live editable sandbox](https://codesandbox.io/s/github/pmndrs/react-three-lightmap/tree/main/demo-sandbox).
 
 ## Local Development
 
@@ -14,5 +14,7 @@ cd react-three-lightmap
 yarn
 yarn storybook
 ```
+
+## Notes
 
 Based on [original experimental implementation](https://github.com/unframework/threejs-lightmap-baker) by [@unframework](https://github.com/unframework).
