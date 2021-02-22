@@ -9,7 +9,7 @@ import React from 'react';
 import ReactDOM from 'react-dom';
 import { Canvas, useLoader, useResource, useFrame } from 'react-three-fiber';
 import { OrbitControls } from '@react-three/drei';
-// import { Lightmap } from '@react-three/lightmap'; // @todo
+import { Lightmap } from '@react-three/lightmap';
 import * as THREE from 'three';
 
 import './index.css';
@@ -26,8 +26,7 @@ const Scene = () => {
   );
 
   return (
-    //<Lightmap> @todo
-    <group>
+    <Lightmap>
       <mesh position={[0, 0, -0.1]} receiveShadow>
         <planeBufferGeometry attach="geometry" args={[9, 5]} />
         <meshLambertMaterial attach="material" color="#ffffff" />
@@ -50,8 +49,7 @@ const Scene = () => {
       </mesh>
 
       <directionalLight intensity={1.5} position={[-2, 2, 4]} castShadow />
-    </group>
-    //</Lightmap> @todo
+    </Lightmap>
   );
 };
 
