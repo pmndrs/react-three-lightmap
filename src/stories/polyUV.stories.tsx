@@ -8,10 +8,11 @@ import Lightmap, { AutoUV2Ignore } from '../core/Lightmap';
 import Spinner from './Spinner';
 import { DebugOverlayRenderer, DebugOverlayWidgets } from './DebugOverlayScene';
 
-import './viewport.css';
-
 export default {
-  title: 'Cylinder scene (polygon UV)'
+  title: 'Cylinder scene (polygon UV)',
+  parameters: {
+    layout: 'fullscreen'
+  }
 } as Meta;
 
 export const Main: Story = () => (

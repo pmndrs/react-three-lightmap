@@ -8,10 +8,11 @@ import Lightmap, { AutoUV2Ignore } from '../core/Lightmap';
 import Spinner from './Spinner';
 import { DebugOverlayRenderer, DebugOverlayWidgets } from './DebugOverlayScene';
 
-import './viewport.css';
-
 export default {
-  title: 'Text mesh scene'
+  title: 'Text mesh scene',
+  parameters: {
+    layout: 'fullscreen'
+  }
 } as Meta;
 
 const Scene: React.FC = () => {

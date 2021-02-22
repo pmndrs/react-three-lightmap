@@ -9,11 +9,13 @@ import Lightmap, { AutoUV2Ignore } from '../core/Lightmap';
 import Spinner from './Spinner';
 import { DebugOverlayRenderer, DebugOverlayWidgets } from './DebugOverlayScene';
 
-import './viewport.css';
 import sceneUrl from './tile-game-room6.glb';
 
 export default {
-  title: 'glTF scene'
+  title: 'glTF scene',
+  parameters: {
+    layout: 'fullscreen'
+  }
 } as Meta;
 
 const MainSceneContents: React.FC = () => {

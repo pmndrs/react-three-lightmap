@@ -9,11 +9,13 @@ import Lightmap, { AutoUV2Ignore } from '../core/Lightmap';
 import Spinner from './Spinner';
 import { DebugOverlayRenderer, DebugOverlayWidgets } from './DebugOverlayScene';
 
-import './viewport.css';
 import sceneUrl from './cylinder-smooth.glb';
 
 export default {
-  title: 'Smooth normals scene'
+  title: 'Smooth normals scene',
+  parameters: {
+    layout: 'fullscreen'
+  }
 } as Meta;
 
 const MainSceneContents: React.FC = () => {

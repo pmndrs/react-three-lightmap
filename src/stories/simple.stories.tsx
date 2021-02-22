@@ -8,10 +8,11 @@ import Lightmap from '../core/Lightmap';
 import Spinner from './Spinner';
 import { DebugOverlayRenderer, DebugOverlayWidgets } from './DebugOverlayScene';
 
-import './viewport.css';
-
 export default {
-  title: 'Simple scene'
+  title: 'Simple scene',
+  parameters: {
+    layout: 'fullscreen'
+  }
 } as Meta;
 
 export const Main: Story = () => (
