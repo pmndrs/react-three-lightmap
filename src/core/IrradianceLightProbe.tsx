@@ -24,7 +24,7 @@ export interface LightProbeSettings {
   targetSize: number;
 }
 
-export const DEFAULT_LIGHT_PROBE_SETTINGS = {
+export const DEFAULT_LIGHT_PROBE_SETTINGS: LightProbeSettings = {
   targetSize: 16
 };
 
