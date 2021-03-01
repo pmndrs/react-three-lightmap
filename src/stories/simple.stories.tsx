@@ -12,7 +12,8 @@ export default {
   title: 'Simple scene',
   parameters: {
     layout: 'fullscreen'
-  }
+  },
+  decorators: [(story) => <div style={{ height: '100vh' }}>{story()}</div>]
 } as Meta;
 
 export const Main: Story = () => (

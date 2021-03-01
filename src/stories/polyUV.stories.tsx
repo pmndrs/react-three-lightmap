@@ -12,7 +12,8 @@ export default {
   title: 'Cylinder scene (polygon UV)',
   parameters: {
     layout: 'fullscreen'
-  }
+  },
+  decorators: [(story) => <div style={{ height: '100vh' }}>{story()}</div>]
 } as Meta;
 
 export const Main: Story = () => (
