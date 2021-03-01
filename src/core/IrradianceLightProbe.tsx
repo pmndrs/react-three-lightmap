@@ -20,6 +20,14 @@ const PROBE_BG_COLOR = new THREE.Color('#000000');
 
 export const PROBE_BATCH_COUNT = 8;
 
+export interface LightProbeSettings {
+  targetSize: number;
+}
+
+export const DEFAULT_LIGHT_PROBE_SETTINGS = {
+  targetSize: 16
+};
+
 export type ProbeDataHandler = (
   rgbaData: Float32Array,
   rowPixelStride: number,
@@ -120,12 +128,14 @@ function setUpProbeSide(
 }
 
 export function useLightProbe(
-  probeTargetSize: number
+  settings: LightProbeSettings
 ): {
   renderLightProbeBatch: ProbeBatcher;
   probePixelAreaLookup: number[];
   debugLightProbeTexture: THREE.Texture;
 } {
+  const probeTargetSize = settings.targetSize;
+
   const probePixelCount = probeTargetSize * probeTargetSize;
   const halfSize = probeTargetSize / 2;
 
@@ -141,6 +151,14 @@ export function useLightProbe(
       generateMipmaps: false
     });
   }, [targetWidth, targetHeight]);
+
+  useEffect(
+    () => () => {
+      // clean up on unmount
+      probeTarget.dispose();
+    },
+    [probeTarget]
+  );
 
   // for each pixel in the individual probe viewport, compute contribution to final tally
   // (edges are weaker because each pixel covers less of a view angle)
@@ -168,14 +186,6 @@ export function useLightProbe(
 
     return lookup;
   }, [probePixelCount, probeTargetSize]);
-
-  useEffect(
-    () => () => {
-      // clean up on unmount
-      probeTarget.dispose();
-    },
-    [probeTarget]
-  );
 
   const probeCam = useMemo(() => {
     const rtFov = 90; // view cone must be quarter of the hemisphere

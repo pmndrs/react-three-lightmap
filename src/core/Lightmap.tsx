@@ -12,6 +12,10 @@ import IrradianceSceneManager from './IrradianceSceneManager';
 import WorkManager from './WorkManager';
 import IrradianceRenderer from './IrradianceRenderer';
 import IrradianceScene from './IrradianceScene';
+import {
+  LightProbeSettings,
+  DEFAULT_LIGHT_PROBE_SETTINGS
+} from './IrradianceLightProbe';
 
 // prevent automatic generation of UV2 coordinates for content
 // (but still allow contribution to lightmap, for e.g. emissive objects, large occluders, etc)
@@ -49,10 +53,14 @@ export const LightmapIgnore: React.FC = ({ children }) => {
   );
 };
 
+// avoid using "light probe" name externally, to avoid confusion with light probe grid tech
+export type SamplerSettings = Partial<LightProbeSettings>;
+
 export interface LightmapProps {
   lightMapSize?: number | [number, number];
   textureFilter?: THREE.TextureFilter;
   texelsPerUnit?: number;
+  samplerSettings?: SamplerSettings;
 }
 
 const LocalSuspender: React.FC = () => {
@@ -64,50 +72,59 @@ const LocalSuspender: React.FC = () => {
 const Lightmap = React.forwardRef<
   THREE.Scene,
   React.PropsWithChildren<LightmapProps>
->(({ lightMapSize, textureFilter, texelsPerUnit, children }, sceneRef) => {
-  // parse the convenience setting
-  const [[initialWidth, initialHeight]] = useState(() =>
-    lightMapSize
-      ? [
-          typeof lightMapSize === 'number' ? lightMapSize : lightMapSize[0],
-          typeof lightMapSize === 'number' ? lightMapSize : lightMapSize[1]
-        ]
-      : [undefined, undefined]
-  );
+>(
+  (
+    { lightMapSize, textureFilter, texelsPerUnit, samplerSettings, children },
+    sceneRef
+  ) => {
+    // parse the convenience setting
+    const [[initialWidth, initialHeight]] = useState(() =>
+      lightMapSize
+        ? [
+            typeof lightMapSize === 'number' ? lightMapSize : lightMapSize[0],
+            typeof lightMapSize === 'number' ? lightMapSize : lightMapSize[1]
+          ]
+        : [undefined, undefined]
+    );
 
-  const [isComplete, setIsComplete] = useState(false);
+    const [isComplete, setIsComplete] = useState(false);
 
-  return (
-    <>
-      <IrradianceSceneManager
-        initialWidth={initialWidth}
-        initialHeight={initialHeight}
-        textureFilter={textureFilter}
-        texelsPerUnit={texelsPerUnit}
-      >
-        {(workbench, startWorkbench) => (
-          <LightmapProgressContext.Provider value={!isComplete}>
-            <WorkManager>
-              {workbench && !isComplete && (
-                <IrradianceRenderer
-                  workbench={workbench}
-                  onComplete={() => {
-                    setIsComplete(true);
-                  }}
-                />
-              )}
-            </WorkManager>
+    return (
+      <>
+        <IrradianceSceneManager
+          initialWidth={initialWidth}
+          initialHeight={initialHeight}
+          textureFilter={textureFilter}
+          texelsPerUnit={texelsPerUnit}
+        >
+          {(workbench, startWorkbench) => (
+            <LightmapProgressContext.Provider value={!isComplete}>
+              <WorkManager>
+                {workbench && !isComplete && (
+                  <IrradianceRenderer
+                    workbench={workbench}
+                    settings={{
+                      ...DEFAULT_LIGHT_PROBE_SETTINGS,
+                      ...samplerSettings
+                    }}
+                    onComplete={() => {
+                      setIsComplete(true);
+                    }}
+                  />
+                )}
+              </WorkManager>
 
-            <IrradianceScene ref={sceneRef} onReady={startWorkbench}>
-              {children}
-            </IrradianceScene>
-          </LightmapProgressContext.Provider>
-        )}
-      </IrradianceSceneManager>
+              <IrradianceScene ref={sceneRef} onReady={startWorkbench}>
+                {children}
+              </IrradianceScene>
+            </LightmapProgressContext.Provider>
+          )}
+        </IrradianceSceneManager>
 
-      {!isComplete && <LocalSuspender />}
-    </>
-  );
-});
+        {!isComplete && <LocalSuspender />}
+      </>
+    );
+  }
+);
 
 export default Lightmap;
