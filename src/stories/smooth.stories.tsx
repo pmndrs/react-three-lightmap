@@ -15,7 +15,8 @@ export default {
   title: 'Smooth normals scene',
   parameters: {
     layout: 'fullscreen'
-  }
+  },
+  decorators: [(story) => <div style={{ height: '100vh' }}>{story()}</div>]
 } as Meta;
 
 const MainSceneContents: React.FC = () => {

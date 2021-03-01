@@ -140,11 +140,6 @@ const IrradianceAtlasMapper: React.FC<{
       }
 
       const faceVertexCount = indexAttr.array.length;
-      const normalAttr = buffer.attributes.normal;
-
-      if (!normalAttr || !(normalAttr instanceof THREE.BufferAttribute)) {
-        throw new Error('expected normal attribute');
-      }
 
       if (!(uv2Attr instanceof THREE.BufferAttribute)) {
         throw new Error('expected uv2 attribute');
@@ -160,10 +155,6 @@ const IrradianceAtlasMapper: React.FC<{
       const atlasUV2Attr = new THREE.Float32BufferAttribute(
         faceVertexCount * 2,
         2
-      );
-      const atlasNormalAttr = new THREE.Float32BufferAttribute(
-        faceVertexCount * 3,
-        3
       );
       const atlasFaceInfoAttr = new THREE.Float32BufferAttribute(
         faceVertexCount * 4,
@@ -188,12 +179,6 @@ const IrradianceAtlasMapper: React.FC<{
           indexData[faceVertexIndex]
         );
 
-        atlasNormalAttr.copyAt(
-          faceVertexIndex,
-          normalAttr,
-          indexData[faceVertexIndex]
-        );
-
         // position of vertex in face: (0,0), (0,1) or (1,0)
         const facePosX = faceMod & 1;
         const facePosY = (faceMod & 2) >> 1;
@@ -214,7 +199,6 @@ const IrradianceAtlasMapper: React.FC<{
       const atlasBuffer = new THREE.BufferGeometry();
       atlasBuffer.setAttribute('position', atlasPosAttr);
       atlasBuffer.setAttribute('uv2', atlasUV2Attr);
-      atlasBuffer.setAttribute('normal', atlasNormalAttr);
       atlasBuffer.setAttribute('faceInfo', atlasFaceInfoAttr);
 
       items.push({
