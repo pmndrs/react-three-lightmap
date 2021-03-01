@@ -13,9 +13,6 @@ const tmpLookAt = new THREE.Vector3();
 const tmpProbeBox = new THREE.Vector4();
 const tmpPrevClearColor = new THREE.Color();
 
-// used inside blending function
-const tmpNormalOther = new THREE.Vector3();
-
 const PROBE_BG_COLOR = new THREE.Color('#000000');
 
 export const PROBE_BATCH_COUNT = 8;
@@ -44,34 +41,6 @@ export type ProbeBatcher = (
   batchItemCallback: (renderer: ProbeBatchRenderer) => void,
   batchResultCallback: (batchIndex: number, reader: ProbeBatchReader) => void
 ) => void;
-
-// "raw" means that output is not normalized (not necessary for now)
-function setBlendedNormalRaw(
-  out: THREE.Vector3,
-  origNormalArray: ArrayLike<number>,
-  origIndexArray: ArrayLike<number>,
-  faceVertexBase: number,
-  pU: number,
-  pV: number
-) {
-  // barycentric coordinate for origin point
-  const pO = 1 - pU - pV;
-
-  out.fromArray(origNormalArray, origIndexArray[faceVertexBase] * 3);
-  out.multiplyScalar(pO);
-
-  tmpNormalOther.fromArray(
-    origNormalArray,
-    origIndexArray[faceVertexBase + 1] * 3
-  );
-  out.addScaledVector(tmpNormalOther, pU);
-
-  tmpNormalOther.fromArray(
-    origNormalArray,
-    origIndexArray[faceVertexBase + 2] * 3
-  );
-  out.addScaledVector(tmpNormalOther, pV);
-}
 
 function setUpProbeUp(
   probeCam: THREE.Camera,
@@ -254,17 +223,25 @@ export function useLightProbe(
         tmpOrigin.addScaledVector(tmpU, pU);
         tmpOrigin.addScaledVector(tmpV, pV);
 
-        // compute normal and cardinal directions
-        // (done per texel for linear interpolation of normals)
-        setBlendedNormalRaw(
-          tmpNormal,
-          origNormalArray,
-          origIndexArray,
-          faceVertexBase,
-          pU,
-          pV
-        );
+        // compute "real" normal direction from geometry
+        // (mesh normals can deviate to simulate curvature, so using that might clip light probe frustum through surface)
+        tmpNormal.fromArray(origPosArray, origIndexArray[faceVertexBase] * 3);
 
+        tmpU.fromArray(origPosArray, origIndexArray[faceVertexBase + 1] * 3);
+        tmpU.sub(tmpNormal);
+
+        tmpV.fromArray(origPosArray, origIndexArray[faceVertexBase + 2] * 3);
+        tmpV.sub(tmpNormal);
+
+        tmpNormal.crossVectors(tmpU, tmpV);
+
+        // check against mesh normal data if we should flip direction due to winding order
+        tmpU.fromArray(origNormalArray, origIndexArray[faceVertexBase] * 3);
+        if (tmpU.dot(tmpNormal) < 0) {
+          tmpNormal.negate();
+        }
+
+        // compute cardinal directions
         // use consistent "left" and "up" directions based on just the normal
         if (tmpNormal.x === 0 && tmpNormal.y === 0) {
           tmpU.set(1, 0, 0);
