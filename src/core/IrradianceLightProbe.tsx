@@ -54,19 +54,23 @@ function setBlendedNormalRaw(
   pU: number,
   pV: number
 ) {
+  // barycentric coordinate for origin point
+  const pO = 1 - pU - pV;
+
   out.fromArray(origNormalArray, origIndexArray[faceVertexBase] * 3);
+  out.multiplyScalar(pO);
 
   tmpNormalOther.fromArray(
     origNormalArray,
     origIndexArray[faceVertexBase + 1] * 3
   );
-  out.lerp(tmpNormalOther, pU);
+  out.addScaledVector(tmpNormalOther, pU);
 
   tmpNormalOther.fromArray(
     origNormalArray,
     origIndexArray[faceVertexBase + 2] * 3
   );
-  out.lerp(tmpNormalOther, pV);
+  out.addScaledVector(tmpNormalOther, pV);
 }
 
 function setUpProbeUp(
