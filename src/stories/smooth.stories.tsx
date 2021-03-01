@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React from 'react';
 import { Story, Meta } from '@storybook/react';
 import { useLoader, Canvas } from 'react-three-fiber';
 import { OrbitControls } from '@react-three/drei';
@@ -20,46 +20,20 @@ export default {
 } as Meta;
 
 const MainSceneContents: React.FC = () => {
-  const loadedData = useLoader(GLTFLoader, sceneUrl);
+  const { nodes } = useLoader(GLTFLoader, sceneUrl);
 
-  const loadedMeshList = useMemo(() => {
-    const meshes: THREE.Mesh[] = [];
+  // apply visual tweaks to our mesh
+  const mesh = nodes.Cylinder;
 
-    loadedData.scene.traverse((object) => {
-      if (!(object instanceof THREE.Mesh)) {
-        return;
-      }
+  if (
+    mesh instanceof THREE.Mesh &&
+    mesh.material instanceof THREE.MeshStandardMaterial
+  ) {
+    mesh.material.metalness = 0; // override default full metalness (to have diffuse component)
+  }
 
-      // convert glTF's standard material into Lambert
-      if (object.material) {
-        const stdMat = object.material as THREE.MeshStandardMaterial;
-
-        if (stdMat.map) {
-          stdMat.map.magFilter = THREE.NearestFilter;
-        }
-
-        if (stdMat.emissiveMap) {
-          stdMat.emissiveMap.magFilter = THREE.NearestFilter;
-        }
-
-        object.material = new THREE.MeshLambertMaterial({
-          color: stdMat.color,
-          map: stdMat.map,
-          emissive: stdMat.emissive,
-          emissiveMap: stdMat.emissiveMap,
-          emissiveIntensity: stdMat.emissiveIntensity
-        });
-
-        // always cast shadow, but only albedo materials receive it
-        object.castShadow = true;
-        object.receiveShadow = true;
-      }
-
-      meshes.push(object);
-    });
-
-    return meshes;
-  }, [loadedData]);
+  mesh.castShadow = true;
+  mesh.receiveShadow = true;
 
   return (
     <AutoUV2Ignore>
@@ -72,9 +46,7 @@ const MainSceneContents: React.FC = () => {
         />
       </mesh>
 
-      {loadedMeshList.map((mesh) => (
-        <primitive key={mesh.uuid} object={mesh} dispose={null} />
-      ))}
+      <primitive key={mesh.uuid} object={mesh} dispose={null} />
     </AutoUV2Ignore>
   );
 };
