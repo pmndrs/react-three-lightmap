@@ -1,6 +1,6 @@
 {
   "name": "@react-three/lightmap",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "In-browser lightmap/AO baker for react-three-fiber and ThreeJS",
   "keywords": [
     "react",
