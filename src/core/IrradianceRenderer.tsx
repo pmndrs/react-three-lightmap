@@ -3,7 +3,11 @@ import { useFrame } from 'react-three-fiber';
 import * as THREE from 'three';
 
 import { WorkManagerContext } from './WorkManager';
-import { Workbench, AtlasMap } from './IrradianceAtlasMapper';
+import {
+  traverseAtlasItems,
+  Workbench,
+  AtlasMap
+} from './IrradianceAtlasMapper';
 import {
   ProbeBatchRenderer,
   ProbeBatchReader,
@@ -181,6 +185,53 @@ function storeLightMapValue(
   }
 }
 
+function useScenePrep(
+  workbenchRef: React.MutableRefObject<Workbench>,
+  outputIsComplete: boolean
+) {
+  useEffect(() => {
+    // nothing to do if finished
+    if (outputIsComplete) {
+      return () => undefined;
+    }
+
+    // prepare the scene for baking
+    const { lightScene, irradiance } = workbenchRef.current;
+
+    traverseAtlasItems(lightScene, (mesh) => {
+      // simple check for type (no need to check for uv2 presence)
+      if (!(mesh instanceof THREE.Mesh)) {
+        return;
+      }
+
+      // attach the lightmap to materials that we recognize
+      // (checking against accidentally overriding some unrelated lightmap)
+      // @todo allow manually attaching to custom materials too
+      const material = mesh.material;
+      if (
+        material &&
+        !Array.isArray(material) &&
+        (material instanceof THREE.MeshLambertMaterial ||
+          material instanceof THREE.MeshPhongMaterial ||
+          material instanceof THREE.MeshStandardMaterial ||
+          material instanceof THREE.MeshPhysicalMaterial)
+      ) {
+        if (material.lightMap && material.lightMap !== irradiance) {
+          throw new Error(
+            'do not set your own light map manually on baked scene meshes'
+          );
+        }
+
+        material.lightMap = irradiance;
+      }
+    });
+
+    return () => {
+      // no-op for now
+    };
+  }, [outputIsComplete]);
+}
+
 // individual renderer worker lifecycle instance
 // (in parent, key to workbench.id to restart on changes)
 // @todo report completed flag
@@ -308,6 +359,8 @@ const IrradianceRenderer: React.FC<{
 
   const outputIsComplete =
     processingState.passesRemaining === 0 && processingState.passComplete;
+
+  useScenePrep(workbenchRef, outputIsComplete);
 
   useWorkManager(
     outputIsComplete
