@@ -7,8 +7,8 @@
 
 import React from 'react';
 import ReactDOM from 'react-dom';
-import { Canvas, useLoader, useResource, useFrame } from 'react-three-fiber';
-import { OrbitControls } from '@react-three/drei';
+import { Canvas, useLoader } from 'react-three-fiber';
+import { OrbitControls, Html } from '@react-three/drei';
 import { Lightmap } from '@react-three/lightmap';
 import * as THREE from 'three';
 
@@ -26,13 +26,13 @@ const Scene = () => {
   );
 
   return (
-    <Lightmap>
+    <group>
       <mesh position={[0, 0, -0.1]} receiveShadow>
         <planeBufferGeometry attach="geometry" args={[9, 5]} />
-        <meshLambertMaterial attach="material" color="#ffffff" />
+        <meshLambertMaterial attach="material" color="#60a0ff" />
       </mesh>
 
-      <mesh position={[-3.2, -0.8, 0]} castShadow receiveShadow>
+      <mesh position={[-3.2, -0.8, 0]} castShadow>
         <textBufferGeometry
           attach="geometry"
           args={[
@@ -45,38 +45,11 @@ const Scene = () => {
             }
           ]}
         />
-        <meshLambertMaterial attach="material" color="#ffe020" />
+        <meshLambertMaterial attach="material" color="#ff6080" />
       </mesh>
 
       <directionalLight intensity={1.5} position={[-2, 2, 4]} castShadow />
-    </Lightmap>
-  );
-};
-
-const Spinner = () => {
-  const meshRef = useResource();
-
-  useFrame(({ clock }) => {
-    // @todo meshRef.current can be undefined on unmount, fix upstream
-    if (meshRef.current && meshRef.current.rotation.isEuler) {
-      meshRef.current.rotation.x = Math.sin(clock.elapsedTime * 0.2);
-      meshRef.current.rotation.y = Math.sin(clock.elapsedTime * 0.5);
-      meshRef.current.rotation.z = Math.sin(clock.elapsedTime);
-
-      const initialZoom = Math.sin(Math.min(clock.elapsedTime, Math.PI / 2));
-      meshRef.current.scale.x = meshRef.current.scale.y = meshRef.current.scale.z =
-        (1 + 0.2 * Math.sin(clock.elapsedTime * 1.5)) * initialZoom;
-    }
-  });
-
-  return (
-    <group>
-      <pointLight position={[-4, 4, 8]} />
-
-      <mesh ref={meshRef}>
-        <dodecahedronGeometry args={[2]} />
-        <meshLambertMaterial color="#808080" />
-      </mesh>
+      <ambientLight color="#406040" />
     </group>
   );
 };
@@ -93,8 +66,12 @@ ReactDOM.render(
       gl.outputEncoding = THREE.sRGBEncoding;
     }}
   >
-    <React.Suspense fallback={<Spinner />}>
-      <Scene />
+    <React.Suspense fallback={<Html>Loading font...</Html>}>
+      <React.Suspense fallback={<Scene />}>
+        <Lightmap ao>
+          <Scene />
+        </Lightmap>
+      </React.Suspense>
     </React.Suspense>
 
     <OrbitControls
