@@ -265,16 +265,26 @@ function useScenePrep(
         const stagingMaterial = new THREE.MeshPhongMaterial();
         stagingMaterial.alphaMap = material.alphaMap;
         stagingMaterial.alphaTest = material.alphaTest;
+        // stagingMaterial.aoMap = material.aoMap;
+        // stagingMaterial.aoMapIntensity = material.aoMapIntensity;
         // stagingMaterial.color = material.color;
+        if (!(material instanceof THREE.MeshLambertMaterial)) {
+          stagingMaterial.displacementBias = material.displacementBias;
+          stagingMaterial.displacementMap = material.displacementMap;
+          stagingMaterial.displacementScale = material.displacementScale;
+        }
         // stagingMaterial.emissive = material.emissive;
         // stagingMaterial.emissiveIntensity = material.emissiveIntensity;
         // stagingMaterial.emissiveMap = material.emissiveMap;
         stagingMaterial.flatShading = material.flatShading;
         // stagingMaterial.map = material.map;
+        stagingMaterial.morphNormals = material.morphNormals;
+        stagingMaterial.morphTargets = material.morphTargets;
         stagingMaterial.opacity = material.opacity;
         stagingMaterial.premultipliedAlpha = material.premultipliedAlpha;
         // stagingMaterial.shadowSide = material.shadowSide;
         stagingMaterial.side = material.side;
+        stagingMaterial.skinning = material.skinning;
         stagingMaterial.transparent = material.transparent;
         // stagingMaterial.vertexColors = material.vertexColors;
         stagingMaterial.visible = material.visible;
