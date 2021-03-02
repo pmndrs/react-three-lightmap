@@ -7,11 +7,22 @@ import React, {
 } from 'react';
 import * as THREE from 'three';
 
-import IrradianceAtlasMapper, {
-  Workbench,
-  AtlasMap
-} from './IrradianceAtlasMapper';
+import IrradianceAtlasMapper, { AtlasMap } from './IrradianceAtlasMapper';
+import { LightProbeSettings } from './IrradianceLightProbe';
 import { computeAutoUV2Layout } from './AutoUV2';
+
+export interface Workbench {
+  id: number; // for refresh
+  lightScene: THREE.Scene;
+  atlasMap: AtlasMap;
+
+  // lightmap output
+  irradiance: THREE.Texture;
+  irradianceData: Float32Array;
+
+  // sampler settings
+  settings: LightProbeSettings;
+}
 
 export const IrradianceDebugContext = React.createContext<{
   atlasTexture: THREE.Texture;
@@ -51,6 +62,7 @@ const IrradianceSceneManager: React.FC<{
   initialHeight?: number;
   textureFilter?: THREE.TextureFilter;
   texelsPerUnit?: number;
+  settings: LightProbeSettings;
   children: (
     workbench: Workbench | null,
     startWorkbench: (scene: THREE.Scene) => void
@@ -60,6 +72,7 @@ const IrradianceSceneManager: React.FC<{
   initialHeight,
   textureFilter,
   texelsPerUnit,
+  settings,
   children
 }) => {
   // read once
@@ -67,6 +80,7 @@ const IrradianceSceneManager: React.FC<{
   const initialHeightRef = useRef(initialHeight);
   const textureFilterRef = useRef(textureFilter);
   const texelsPerUnitRef = useRef(texelsPerUnit); // read only once
+  const settingsRef = useRef(settings); // read only once
 
   // basic snapshot triggered by start handler
   const [workbenchBasics, setWorkbenchBasics] = useState<{
@@ -168,7 +182,9 @@ const IrradianceSceneManager: React.FC<{
         atlasMap,
 
         irradiance: lightMapBasics.irradiance,
-        irradianceData: lightMapBasics.irradianceData
+        irradianceData: lightMapBasics.irradianceData,
+
+        settings: settingsRef.current
       });
     },
     [workbenchBasics, lightMapBasics]

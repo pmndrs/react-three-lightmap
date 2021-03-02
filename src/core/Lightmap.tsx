@@ -96,6 +96,10 @@ const Lightmap = React.forwardRef<
           initialHeight={initialHeight}
           textureFilter={textureFilter}
           texelsPerUnit={texelsPerUnit}
+          settings={{
+            ...DEFAULT_LIGHT_PROBE_SETTINGS,
+            ...samplerSettings
+          }}
         >
           {(workbench, startWorkbench) => (
             <LightmapProgressContext.Provider value={!isComplete}>
@@ -103,10 +107,6 @@ const Lightmap = React.forwardRef<
                 {workbench && !isComplete && (
                   <IrradianceRenderer
                     workbench={workbench}
-                    settings={{
-                      ...DEFAULT_LIGHT_PROBE_SETTINGS,
-                      ...samplerSettings
-                    }}
                     onComplete={() => {
                       setIsComplete(true);
                     }}

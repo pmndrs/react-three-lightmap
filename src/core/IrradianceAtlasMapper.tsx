@@ -20,16 +20,6 @@ export interface AtlasMap {
   texture: THREE.Texture;
 }
 
-export interface Workbench {
-  id: number; // for refresh
-  lightScene: THREE.Scene;
-  atlasMap: AtlasMap;
-
-  // lightmap output
-  irradiance: THREE.Texture;
-  irradianceData: Float32Array;
-}
-
 // must be black for full zeroing
 const ATLAS_BG_COLOR = new THREE.Color('#000000');
 

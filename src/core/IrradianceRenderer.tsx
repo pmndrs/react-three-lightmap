@@ -3,15 +3,11 @@ import { useFrame } from 'react-three-fiber';
 import * as THREE from 'three';
 
 import { WorkManagerContext } from './WorkManager';
-import {
-  traverseAtlasItems,
-  Workbench,
-  AtlasMap
-} from './IrradianceAtlasMapper';
+import { traverseAtlasItems, AtlasMap } from './IrradianceAtlasMapper';
+import { Workbench } from './IrradianceSceneManager';
 import {
   ProbeBatchRenderer,
   ProbeBatchReader,
-  LightProbeSettings,
   useLightProbe
 } from './IrradianceLightProbe';
 
@@ -345,7 +341,6 @@ function useScenePrep(
 // @todo report completed flag
 const IrradianceRenderer: React.FC<{
   workbench: Workbench;
-  settings: LightProbeSettings;
   onComplete: () => void;
   onDebugLightProbe?: (debugLightProbeTexture: THREE.Texture) => void;
 }> = (props) => {
@@ -462,7 +457,7 @@ const IrradianceRenderer: React.FC<{
   }, [processingState]);
 
   const { renderLightProbeBatch, probePixelAreaLookup } = useLightProbe(
-    props.settings
+    workbenchRef.current.settings
   );
 
   const outputIsComplete =
@@ -555,7 +550,7 @@ const IrradianceRenderer: React.FC<{
   const {
     renderLightProbeBatch: debugProbeBatch,
     debugLightProbeTexture
-  } = useLightProbe(props.settings);
+  } = useLightProbe(workbenchRef.current.settings);
   const debugProbeRef = useRef(false);
   useFrame(({ gl }) => {
     // run only once
