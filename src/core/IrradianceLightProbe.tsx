@@ -24,11 +24,15 @@ export const PROBE_BATCH_COUNT = 8;
 export interface LightProbeSettings {
   targetSize: number;
   offset: number;
+  near: number;
+  far: number;
 }
 
 export const DEFAULT_LIGHT_PROBE_SETTINGS: LightProbeSettings = {
   targetSize: 16,
-  offset: 0
+  offset: 0,
+  near: 0.05,
+  far: 50
 };
 
 export type ProbeDataHandler = (
@@ -197,10 +201,10 @@ export function useLightProbe(
   const probeCam = useMemo(() => {
     const rtFov = 90; // view cone must be quarter of the hemisphere
     const rtAspect = 1; // square render target
-    const rtNear = 0.05; // @todo overridable setting
-    const rtFar = aoMode ? 1.5 : 50; // @todo overridable in either mode
+    const rtNear = settings.near;
+    const rtFar = aoMode ? 1.5 : settings.far; // @todo overridable in either mode
     return new THREE.PerspectiveCamera(rtFov, rtAspect, rtNear, rtFar);
-  }, [aoMode]);
+  }, [aoMode, settings]);
 
   const probeData = useMemo(() => {
     return new Float32Array(targetWidth * targetHeight * 4);
