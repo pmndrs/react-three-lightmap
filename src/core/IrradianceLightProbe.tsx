@@ -20,6 +20,16 @@ const PROBE_BG_COLOR = new THREE.Color('#000000');
 
 export const PROBE_BATCH_COUNT = 8;
 
+export interface LightProbeSettings {
+  targetSize: number;
+  offset: number;
+}
+
+export const DEFAULT_LIGHT_PROBE_SETTINGS: LightProbeSettings = {
+  targetSize: 16,
+  offset: 0
+};
+
 export type ProbeDataHandler = (
   rgbaData: Float32Array,
   rowPixelStride: number,
@@ -45,8 +55,8 @@ export type ProbeBatcher = (
   batchResultCallback: (batchIndex: number, reader: ProbeBatchReader) => void
 ) => void;
 
-// "raw" means that output is not normalized (not necessary for now)
-function setBlendedNormalRaw(
+// bilinear interpolation of normals in triangle, with normalization
+function setBlendedNormal(
   out: THREE.Vector3,
   origNormalArray: ArrayLike<number>,
   origIndexArray: ArrayLike<number>,
@@ -71,6 +81,8 @@ function setBlendedNormalRaw(
     origIndexArray[faceVertexBase + 2] * 3
   );
   out.addScaledVector(tmpNormalOther, pV);
+
+  out.normalize();
 }
 
 function setUpProbeUp(
@@ -120,12 +132,14 @@ function setUpProbeSide(
 }
 
 export function useLightProbe(
-  probeTargetSize: number
+  settings: LightProbeSettings
 ): {
   renderLightProbeBatch: ProbeBatcher;
   probePixelAreaLookup: number[];
   debugLightProbeTexture: THREE.Texture;
 } {
+  const probeTargetSize = settings.targetSize;
+
   const probePixelCount = probeTargetSize * probeTargetSize;
   const halfSize = probeTargetSize / 2;
 
@@ -141,6 +155,14 @@ export function useLightProbe(
       generateMipmaps: false
     });
   }, [targetWidth, targetHeight]);
+
+  useEffect(
+    () => () => {
+      // clean up on unmount
+      probeTarget.dispose();
+    },
+    [probeTarget]
+  );
 
   // for each pixel in the individual probe viewport, compute contribution to final tally
   // (edges are weaker because each pixel covers less of a view angle)
@@ -168,14 +190,6 @@ export function useLightProbe(
 
     return lookup;
   }, [probePixelCount, probeTargetSize]);
-
-  useEffect(
-    () => () => {
-      // clean up on unmount
-      probeTarget.dispose();
-    },
-    [probeTarget]
-  );
 
   const probeCam = useMemo(() => {
     const rtFov = 90; // view cone must be quarter of the hemisphere
@@ -256,7 +270,7 @@ export function useLightProbe(
 
         // compute normal and cardinal directions
         // (done per texel for linear interpolation of normals)
-        setBlendedNormalRaw(
+        setBlendedNormal(
           tmpNormal,
           origNormalArray,
           origIndexArray,
@@ -277,6 +291,9 @@ export function useLightProbe(
 
         tmpU.crossVectors(tmpNormal, tmpV);
         tmpU.normalize();
+
+        // nudge the light probe position based on requested offset
+        tmpOrigin.addScaledVector(tmpNormal, settings.offset);
 
         // proceed with the renders
         setUpProbeUp(probeCam, originalMesh, tmpOrigin, tmpNormal, tmpU);

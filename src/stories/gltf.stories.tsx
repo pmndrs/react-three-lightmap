@@ -21,88 +21,55 @@ export default {
 
 const MainSceneContents: React.FC = () => {
   // data loading
-  const loadedData = useLoader(GLTFLoader, sceneUrl);
+  const { nodes } = useLoader(GLTFLoader, sceneUrl);
 
-  const { loadedMeshList, loadedLightList } = useMemo(() => {
-    const meshes: THREE.Mesh[] = [];
-    const lights: THREE.DirectionalLight[] = [];
+  const lightStub = nodes.Light;
 
-    if (loadedData) {
-      loadedData.scene.traverse((object) => {
-        // glTF import is still not great with lights, so we improvise
-        if (object.name.includes('Light')) {
-          const light = new THREE.DirectionalLight();
-          light.intensity = object.scale.z;
+  const light = new THREE.DirectionalLight();
+  light.castShadow = true;
 
-          light.castShadow = true;
-          light.shadow.camera.left = -object.scale.x;
-          light.shadow.camera.right = object.scale.x;
-          light.shadow.camera.top = object.scale.y;
-          light.shadow.camera.bottom = -object.scale.y;
+  // glTF import is still not great with lights, so we improvise
+  light.intensity = lightStub.scale.z;
+  light.shadow.camera.left = -lightStub.scale.x;
+  light.shadow.camera.right = lightStub.scale.x;
+  light.shadow.camera.top = lightStub.scale.y;
+  light.shadow.camera.bottom = -lightStub.scale.y;
 
-          light.position.copy(object.position);
+  light.position.copy(lightStub.position);
 
-          const target = new THREE.Object3D();
-          target.position.set(0, 0, -1);
-          target.position.applyEuler(object.rotation);
-          target.position.add(light.position);
+  const target = new THREE.Object3D();
+  target.position.set(0, 0, -1);
+  target.position.applyEuler(lightStub.rotation);
+  target.position.add(lightStub.position);
 
-          light.target = target;
+  light.target = target;
 
-          lights.push(light);
-          return;
-        }
+  const baseMesh = nodes.Base;
+  if (
+    baseMesh instanceof THREE.Mesh &&
+    baseMesh.material instanceof THREE.MeshStandardMaterial
+  ) {
+    baseMesh.material.metalness = 0; // override default full metalness (to have diffuse component)
+    baseMesh.material.side = THREE.FrontSide;
 
-        if (!(object instanceof THREE.Mesh)) {
-          return;
-        }
-
-        // convert glTF's standard material into Lambert
-        if (object.material) {
-          const stdMat = object.material as THREE.MeshStandardMaterial;
-
-          if (stdMat.map) {
-            stdMat.map.magFilter = THREE.NearestFilter;
-          }
-
-          if (stdMat.emissiveMap) {
-            stdMat.emissiveMap.magFilter = THREE.NearestFilter;
-          }
-
-          object.material = new THREE.MeshPhongMaterial({
-            color: stdMat.color,
-            map: stdMat.map,
-            emissive: stdMat.emissive,
-            emissiveMap: stdMat.emissiveMap,
-            emissiveIntensity: stdMat.emissiveIntensity
-          });
-
-          // always cast shadow, but only albedo materials receive it
-          object.castShadow = true;
-
-          if (stdMat.map) {
-            object.receiveShadow = true;
-          }
-
-          // special case for outer sunlight cover
-          if (object.name === 'Cover') {
-            object.material.depthWrite = false;
-            object.material.colorWrite = false;
-          }
-        }
-
-        meshes.push(object);
-      });
+    if (baseMesh.material.map) {
+      baseMesh.material.map.magFilter = THREE.NearestFilter;
     }
 
-    return {
-      loadedMeshList: meshes,
-      loadedLightList: lights
-    };
-  }, [loadedData]);
+    baseMesh.castShadow = true;
+    baseMesh.receiveShadow = true;
+  }
 
-  const baseMesh = loadedMeshList.find((item) => item.name === 'Base');
-  const coverMesh = loadedMeshList.find((item) => item.name === 'Cover');
+  const coverMesh = nodes.Cover;
+  if (
+    coverMesh instanceof THREE.Mesh &&
+    coverMesh.material instanceof THREE.MeshStandardMaterial
+  ) {
+    coverMesh.castShadow = true; // only cast shadow
+
+    coverMesh.material.depthWrite = false;
+    coverMesh.material.colorWrite = false;
+  }
 
   return (
     <AutoUV2Ignore>
@@ -111,16 +78,12 @@ const MainSceneContents: React.FC = () => {
         <meshBasicMaterial attach="material" color="#171717" />
       </mesh>
 
-      {loadedLightList.map((light) => (
-        <React.Fragment key={light.uuid}>
-          <primitive object={light} dispose={null} />
-          <primitive object={light.target} dispose={null} />
-        </React.Fragment>
-      ))}
+      <primitive object={light} dispose={null} />
+      <primitive object={light.target} dispose={null} />
 
-      {baseMesh && <primitive object={baseMesh} dispose={null} />}
+      <primitive object={baseMesh} dispose={null} />
 
-      {coverMesh && <primitive object={coverMesh} dispose={null} />}
+      <primitive object={coverMesh} dispose={null} />
 
       <spotLight
         position={[0, 0, 2]}

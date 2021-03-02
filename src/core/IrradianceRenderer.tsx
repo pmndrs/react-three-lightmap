@@ -7,6 +7,7 @@ import { Workbench, AtlasMap } from './IrradianceAtlasMapper';
 import {
   ProbeBatchRenderer,
   ProbeBatchReader,
+  LightProbeSettings,
   useLightProbe
 } from './IrradianceLightProbe';
 
@@ -185,6 +186,7 @@ function storeLightMapValue(
 // @todo report completed flag
 const IrradianceRenderer: React.FC<{
   workbench: Workbench;
+  settings: LightProbeSettings;
   onComplete: () => void;
   onDebugLightProbe?: (debugLightProbeTexture: THREE.Texture) => void;
 }> = (props) => {
@@ -300,9 +302,8 @@ const IrradianceRenderer: React.FC<{
     });
   }, [processingState]);
 
-  const probeTargetSize = 16;
   const { renderLightProbeBatch, probePixelAreaLookup } = useLightProbe(
-    probeTargetSize
+    props.settings
   );
 
   const outputIsComplete =
@@ -393,7 +394,7 @@ const IrradianceRenderer: React.FC<{
   const {
     renderLightProbeBatch: debugProbeBatch,
     debugLightProbeTexture
-  } = useLightProbe(probeTargetSize);
+  } = useLightProbe(props.settings);
   const debugProbeRef = useRef(false);
   useFrame(({ gl }) => {
     // run only once
