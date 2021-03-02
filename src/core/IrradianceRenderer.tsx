@@ -220,19 +220,25 @@ function useScenePrep(
     // prepare the scene for baking
     const { lightScene, irradiance } = workbenchRef.current;
 
-    // ambient light for second pass of ambient occlusion
-    // (this lights the texels unmasked by previous AO passes for further propagation)
-    const aoSceneLight = new THREE.AmbientLight('#ffffff');
-    lightScene.add(aoSceneLight);
-
     // process relevant meshes
     const meshCleanupList: THREE.Mesh[] = [];
+    const lightCleanupList: THREE.Light[] = [];
 
-    traverseAtlasItems(lightScene, (mesh) => {
-      // simple check for type (no need to check for uv2 presence)
-      if (!(mesh instanceof THREE.Mesh)) {
+    traverseAtlasItems(lightScene, (object) => {
+      // hide any visible lights to prevent interfering with AO
+      if (object instanceof THREE.Light && object.visible) {
+        object.visible = false;
+        lightCleanupList.push(object);
+
         return;
       }
+
+      // simple check for type (no need to check for uv2 presence)
+      if (!(object instanceof THREE.Mesh)) {
+        return;
+      }
+
+      const mesh = object;
 
       // attach the lightmap to materials that we recognize
       // (checking against accidentally overriding some unrelated lightmap)
@@ -286,9 +292,19 @@ function useScenePrep(
       }
     });
 
+    // add our own ambient light for second pass of ambient occlusion
+    // (this lights the texels unmasked by previous AO passes for further propagation)
+    const aoSceneLight = new THREE.AmbientLight('#ffffff');
+    lightScene.add(aoSceneLight);
+
     return () => {
       // remove the staging ambient light
       lightScene.remove(aoSceneLight);
+
+      // re-enable scene lights
+      lightCleanupList.forEach((light) => {
+        light.visible = true;
+      });
 
       // replace staging material with original
       meshCleanupList.forEach((mesh) => {
