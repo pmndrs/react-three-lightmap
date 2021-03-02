@@ -13,6 +13,9 @@ import { computeAutoUV2Layout } from './AutoUV2';
 
 export interface Workbench {
   id: number; // for refresh
+
+  aoMode: boolean;
+
   lightScene: THREE.Scene;
   atlasMap: AtlasMap;
 
@@ -58,6 +61,7 @@ function createRendererTexture(
 }
 
 const IrradianceSceneManager: React.FC<{
+  aoMode: boolean;
   initialWidth?: number;
   initialHeight?: number;
   textureFilter?: THREE.TextureFilter;
@@ -68,6 +72,7 @@ const IrradianceSceneManager: React.FC<{
     startWorkbench: (scene: THREE.Scene) => void
   ) => React.ReactNode;
 }> = ({
+  aoMode,
   initialWidth,
   initialHeight,
   textureFilter,
@@ -76,6 +81,7 @@ const IrradianceSceneManager: React.FC<{
   children
 }) => {
   // read once
+  const aoModeRef = useRef(aoMode);
   const initialWidthRef = useRef(initialWidth);
   const initialHeightRef = useRef(initialHeight);
   const textureFilterRef = useRef(textureFilter);
@@ -178,6 +184,9 @@ const IrradianceSceneManager: React.FC<{
       // save final copy of workbench
       setWorkbench({
         id: workbenchBasics.id,
+
+        aoMode: aoModeRef.current,
+
         lightScene: workbenchBasics.scene,
         atlasMap,
 

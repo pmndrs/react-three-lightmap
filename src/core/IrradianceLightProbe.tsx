@@ -16,8 +16,8 @@ const tmpPrevClearColor = new THREE.Color();
 // used inside blending function
 const tmpNormalOther = new THREE.Vector3();
 
-// const PROBE_BG_COLOR = new THREE.Color('#000000');
-const PROBE_BG_COLOR = new THREE.Color('#ffffff');
+const PROBE_BG_ZERO = new THREE.Color('#000000');
+const PROBE_BG_FULL = new THREE.Color('#ffffff');
 
 export const PROBE_BATCH_COUNT = 8;
 
@@ -133,6 +133,7 @@ function setUpProbeSide(
 }
 
 export function useLightProbe(
+  aoMode: boolean,
   settings: LightProbeSettings
 ): {
   renderLightProbeBatch: ProbeBatcher;
@@ -140,6 +141,7 @@ export function useLightProbe(
   debugLightProbeTexture: THREE.Texture;
 } {
   const probeTargetSize = settings.targetSize;
+  const probeBgColor = aoMode ? PROBE_BG_FULL : PROBE_BG_ZERO;
 
   const probePixelCount = probeTargetSize * probeTargetSize;
   const halfSize = probeTargetSize / 2;
@@ -195,11 +197,10 @@ export function useLightProbe(
   const probeCam = useMemo(() => {
     const rtFov = 90; // view cone must be quarter of the hemisphere
     const rtAspect = 1; // square render target
-    const rtNear = 0.05;
-    // const rtFar = 50;
-    const rtFar = 1.5;
+    const rtNear = 0.05; // @todo overridable setting
+    const rtFar = aoMode ? 1.5 : 50; // @todo overridable in either mode
     return new THREE.PerspectiveCamera(rtFov, rtAspect, rtNear, rtFar);
-  }, []);
+  }, [aoMode]);
 
   const probeData = useMemo(() => {
     return new Float32Array(targetWidth * targetHeight * 4);
@@ -232,7 +233,7 @@ export function useLightProbe(
     gl.autoClear = false;
 
     // clear entire area
-    gl.setClearColor(PROBE_BG_COLOR, 1);
+    gl.setClearColor(probeBgColor, 1);
     gl.clear(true, true, false);
 
     for (let batchItem = 0; batchItem < PROBE_BATCH_COUNT; batchItem += 1) {

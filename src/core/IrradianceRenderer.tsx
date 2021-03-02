@@ -214,7 +214,7 @@ function useScenePrep(
     }
 
     // prepare the scene for baking
-    const { lightScene, irradiance } = workbenchRef.current;
+    const { aoMode, lightScene, irradiance } = workbenchRef.current;
 
     // process relevant meshes
     const meshCleanupList: THREE.Mesh[] = [];
@@ -222,7 +222,7 @@ function useScenePrep(
 
     traverseAtlasItems(lightScene, (object) => {
       // hide any visible lights to prevent interfering with AO
-      if (object instanceof THREE.Light && object.visible) {
+      if (aoMode && object instanceof THREE.Light && object.visible) {
         object.visible = false;
         lightCleanupList.push(object);
 
@@ -245,10 +245,19 @@ function useScenePrep(
         !Array.isArray(material) &&
         materialIsSupported(material)
       ) {
-        if (material.lightMap && material.lightMap !== irradiance) {
-          throw new Error(
-            'do not set your own light map manually on baked scene meshes'
-          );
+        // basic safety check
+        if (aoMode) {
+          if (material.aoMap && material.aoMap !== irradiance) {
+            throw new Error(
+              'do not set your own AO map manually on baked scene meshes'
+            );
+          }
+        } else {
+          if (material.lightMap && material.lightMap !== irradiance) {
+            throw new Error(
+              'do not set your own light map manually on baked scene meshes'
+            );
+          }
         }
 
         // stash material to be replaced with ours
@@ -261,35 +270,44 @@ function useScenePrep(
         const stagingMaterial = new THREE.MeshPhongMaterial();
         stagingMaterial.alphaMap = material.alphaMap;
         stagingMaterial.alphaTest = material.alphaTest;
-        // stagingMaterial.aoMap = material.aoMap;
-        // stagingMaterial.aoMapIntensity = material.aoMapIntensity;
-        // stagingMaterial.color = material.color;
         if (!(material instanceof THREE.MeshLambertMaterial)) {
           stagingMaterial.displacementBias = material.displacementBias;
           stagingMaterial.displacementMap = material.displacementMap;
           stagingMaterial.displacementScale = material.displacementScale;
         }
-        // stagingMaterial.emissive = material.emissive;
-        // stagingMaterial.emissiveIntensity = material.emissiveIntensity;
-        // stagingMaterial.emissiveMap = material.emissiveMap;
         stagingMaterial.flatShading = material.flatShading;
-        // stagingMaterial.map = material.map;
         stagingMaterial.morphNormals = material.morphNormals;
         stagingMaterial.morphTargets = material.morphTargets;
         stagingMaterial.opacity = material.opacity;
         stagingMaterial.premultipliedAlpha = material.premultipliedAlpha;
-        // stagingMaterial.shadowSide = material.shadowSide;
         stagingMaterial.side = material.side;
         stagingMaterial.skinning = material.skinning;
         stagingMaterial.transparent = material.transparent;
-        // stagingMaterial.vertexColors = material.vertexColors;
         stagingMaterial.visible = material.visible;
 
+        // in non-AO mode, also transfer pigmentation/emissive/other settings
+        if (!aoMode) {
+          stagingMaterial.aoMap = material.aoMap;
+          stagingMaterial.aoMapIntensity = material.aoMapIntensity;
+          stagingMaterial.color = material.color;
+          stagingMaterial.emissive = material.emissive;
+          stagingMaterial.emissiveIntensity = material.emissiveIntensity;
+          stagingMaterial.emissiveMap = material.emissiveMap;
+          stagingMaterial.map = material.map;
+          stagingMaterial.shadowSide = material.shadowSide;
+          stagingMaterial.vertexColors = material.vertexColors;
+        }
+
+        // mandatory settings
         stagingMaterial.shininess = 0; // always fully diffuse
         stagingMaterial.toneMapped = false; // must output in raw linear space
 
-        // stagingMaterial.lightMap = irradiance; // use the lightmap texture
-        stagingMaterial.aoMap = irradiance; // use the AO texture
+        // mode-specific texture setup
+        if (aoMode) {
+          stagingMaterial.aoMap = irradiance; // use the AO texture
+        } else {
+          stagingMaterial.lightMap = irradiance; // use the lightmap texture
+        }
 
         mesh.material = stagingMaterial;
 
@@ -298,14 +316,19 @@ function useScenePrep(
       }
     });
 
-    // add our own ambient light for second pass of ambient occlusion
-    // (this lights the texels unmasked by previous AO passes for further propagation)
-    const aoSceneLight = new THREE.AmbientLight('#ffffff');
-    lightScene.add(aoSceneLight);
+    let aoSceneLight: THREE.Light | null = null;
+    if (aoMode) {
+      // add our own ambient light for second pass of ambient occlusion
+      // (this lights the texels unmasked by previous AO passes for further propagation)
+      aoSceneLight = new THREE.AmbientLight('#ffffff');
+      lightScene.add(aoSceneLight);
+    }
 
     return () => {
       // remove the staging ambient light
-      lightScene.remove(aoSceneLight);
+      if (aoSceneLight) {
+        lightScene.remove(aoSceneLight);
+      }
 
       // re-enable scene lights
       lightCleanupList.forEach((light) => {
@@ -326,8 +349,11 @@ function useScenePrep(
           mesh.material = material;
 
           // also fill in the resulting map
-          // material.lightMap = irradiance;
-          material.aoMap = irradiance;
+          if (aoMode) {
+            material.aoMap = irradiance;
+          } else {
+            material.lightMap = irradiance;
+          }
         } else {
           console.error('lightmap baker: missing original material', mesh);
         }
@@ -457,6 +483,7 @@ const IrradianceRenderer: React.FC<{
   }, [processingState]);
 
   const { renderLightProbeBatch, probePixelAreaLookup } = useLightProbe(
+    workbenchRef.current.aoMode,
     workbenchRef.current.settings
   );
 
@@ -550,7 +577,7 @@ const IrradianceRenderer: React.FC<{
   const {
     renderLightProbeBatch: debugProbeBatch,
     debugLightProbeTexture
-  } = useLightProbe(workbenchRef.current.settings);
+  } = useLightProbe(workbenchRef.current.aoMode, workbenchRef.current.settings);
   const debugProbeRef = useRef(false);
   useFrame(({ gl }) => {
     // run only once

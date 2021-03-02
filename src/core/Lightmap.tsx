@@ -57,6 +57,7 @@ export const LightmapIgnore: React.FC = ({ children }) => {
 export type SamplerSettings = Partial<LightProbeSettings>;
 
 export interface LightmapProps {
+  ao?: boolean;
   lightMapSize?: number | [number, number];
   textureFilter?: THREE.TextureFilter;
   texelsPerUnit?: number;
@@ -74,7 +75,14 @@ const Lightmap = React.forwardRef<
   React.PropsWithChildren<LightmapProps>
 >(
   (
-    { lightMapSize, textureFilter, texelsPerUnit, samplerSettings, children },
+    {
+      ao: aoMode,
+      lightMapSize,
+      textureFilter,
+      texelsPerUnit,
+      samplerSettings,
+      children
+    },
     sceneRef
   ) => {
     // parse the convenience setting
@@ -92,6 +100,7 @@ const Lightmap = React.forwardRef<
     return (
       <>
         <IrradianceSceneManager
+          aoMode={!!aoMode}
           initialWidth={initialWidth}
           initialHeight={initialHeight}
           textureFilter={textureFilter}
