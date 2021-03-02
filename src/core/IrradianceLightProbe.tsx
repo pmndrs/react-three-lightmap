@@ -136,8 +136,10 @@ function setUpProbeSide(
   probeCam.applyMatrix4(mesh.matrixWorld);
 }
 
+// @todo use light sphere for AO (double-check that far-extent is radius + epsilon)
 export function useLightProbe(
   aoMode: boolean,
+  aoDistance: number,
   settings: LightProbeSettings
 ): {
   renderLightProbeBatch: ProbeBatcher;
@@ -202,9 +204,9 @@ export function useLightProbe(
     const rtFov = 90; // view cone must be quarter of the hemisphere
     const rtAspect = 1; // square render target
     const rtNear = settings.near;
-    const rtFar = aoMode ? 1.5 : settings.far; // @todo overridable in either mode
+    const rtFar = aoMode ? aoDistance : settings.far; // in AO mode, lock far-extent to requested distance
     return new THREE.PerspectiveCamera(rtFov, rtAspect, rtNear, rtFar);
-  }, [aoMode, settings]);
+  }, [aoMode, aoDistance, settings]);
 
   const probeData = useMemo(() => {
     return new Float32Array(targetWidth * targetHeight * 4);

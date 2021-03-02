@@ -15,6 +15,7 @@ export interface Workbench {
   id: number; // for refresh
 
   aoMode: boolean;
+  aoDistance: number;
 
   lightScene: THREE.Scene;
   atlasMap: AtlasMap;
@@ -34,6 +35,7 @@ export const IrradianceDebugContext = React.createContext<{
 
 const DEFAULT_LIGHTMAP_SIZE = 64;
 const DEFAULT_TEXELS_PER_UNIT = 2;
+const DEFAULT_AO_DISTANCE = 1.5;
 
 function createRendererTexture(
   atlasWidth: number,
@@ -62,6 +64,7 @@ function createRendererTexture(
 
 const IrradianceSceneManager: React.FC<{
   aoMode: boolean;
+  aoDistance?: number;
   initialWidth?: number;
   initialHeight?: number;
   textureFilter?: THREE.TextureFilter;
@@ -73,6 +76,7 @@ const IrradianceSceneManager: React.FC<{
   ) => React.ReactNode;
 }> = ({
   aoMode,
+  aoDistance,
   initialWidth,
   initialHeight,
   textureFilter,
@@ -82,6 +86,7 @@ const IrradianceSceneManager: React.FC<{
 }) => {
   // read once
   const aoModeRef = useRef(aoMode);
+  const aoDistanceRef = useRef(aoDistance);
   const initialWidthRef = useRef(initialWidth);
   const initialHeightRef = useRef(initialHeight);
   const textureFilterRef = useRef(textureFilter);
@@ -186,6 +191,7 @@ const IrradianceSceneManager: React.FC<{
         id: workbenchBasics.id,
 
         aoMode: aoModeRef.current,
+        aoDistance: aoDistanceRef.current || DEFAULT_AO_DISTANCE,
 
         lightScene: workbenchBasics.scene,
         atlasMap,

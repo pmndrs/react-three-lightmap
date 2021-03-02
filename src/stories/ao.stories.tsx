@@ -4,7 +4,7 @@ import { Canvas } from 'react-three-fiber';
 import { OrbitControls } from '@react-three/drei';
 import * as THREE from 'three';
 
-import Lightmap, { LightmapIgnore } from '../core/Lightmap';
+import Lightmap from '../core/Lightmap';
 import Spinner from './Spinner';
 import { DebugOverlayRenderer, DebugOverlayWidgets } from './DebugOverlayScene';
 

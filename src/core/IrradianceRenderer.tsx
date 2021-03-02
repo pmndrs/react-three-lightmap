@@ -484,6 +484,7 @@ const IrradianceRenderer: React.FC<{
 
   const { renderLightProbeBatch, probePixelAreaLookup } = useLightProbe(
     workbenchRef.current.aoMode,
+    workbenchRef.current.aoDistance,
     workbenchRef.current.settings
   );
 
@@ -577,7 +578,11 @@ const IrradianceRenderer: React.FC<{
   const {
     renderLightProbeBatch: debugProbeBatch,
     debugLightProbeTexture
-  } = useLightProbe(workbenchRef.current.aoMode, workbenchRef.current.settings);
+  } = useLightProbe(
+    workbenchRef.current.aoMode,
+    workbenchRef.current.aoDistance,
+    workbenchRef.current.settings
+  );
   const debugProbeRef = useRef(false);
   useFrame(({ gl }) => {
     // run only once
