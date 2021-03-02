@@ -20,16 +20,6 @@ export interface AtlasMap {
   texture: THREE.Texture;
 }
 
-export interface Workbench {
-  id: number; // for refresh
-  lightScene: THREE.Scene;
-  atlasMap: AtlasMap;
-
-  // lightmap output
-  irradiance: THREE.Texture;
-  irradianceData: Float32Array;
-}
-
 // must be black for full zeroing
 const ATLAS_BG_COLOR = new THREE.Color('#000000');
 
@@ -64,7 +54,7 @@ const FRAGMENT_SHADER = `
 export const ATLAS_OPT_OUT_FLAG = Symbol('lightmap atlas opt out flag');
 
 // based on traverse() in https://github.com/mrdoob/three.js/blob/dev/src/core/Object3D.js
-function traverseAtlasItems(
+export function traverseAtlasItems(
   object: THREE.Object3D,
   callback: (object: THREE.Object3D) => void
 ) {
@@ -96,10 +86,9 @@ function traverseAtlasItems(
 const IrradianceAtlasMapper: React.FC<{
   width: number;
   height: number;
-  lightMap: THREE.Texture;
   lightScene: THREE.Scene;
   onComplete: (atlasMap: AtlasMap) => void;
-}> = ({ width, height, lightMap, lightScene, onComplete }) => {
+}> = ({ width, height, lightScene, onComplete }) => {
   // read value only on first render
   const widthRef = useRef(width);
   const heightRef = useRef(height);
@@ -207,27 +196,6 @@ const IrradianceAtlasMapper: React.FC<{
         originalMesh: mesh,
         originalBuffer: buffer
       });
-
-      // finally, auto-attach the lightmap to materials that we recognize
-      // (checking against accidentally overriding some unrelated lightmap)
-      // @todo allow manually attaching to custom materials too
-      const material = mesh.material;
-      if (
-        material &&
-        !Array.isArray(material) &&
-        (material instanceof THREE.MeshLambertMaterial ||
-          material instanceof THREE.MeshPhongMaterial ||
-          material instanceof THREE.MeshStandardMaterial ||
-          material instanceof THREE.MeshPhysicalMaterial)
-      ) {
-        if (material.lightMap && material.lightMap !== lightMap) {
-          throw new Error(
-            'do not set your own light map manually on baked scene meshes'
-          );
-        }
-
-        material.lightMap = lightMap;
-      }
     });
 
     // disposed during scene unmount

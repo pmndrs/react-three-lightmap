@@ -8,7 +8,7 @@ import {
 import * as THREE from 'three';
 
 import { IrradianceDebugContext } from '../core/IrradianceSceneManager';
-import { PROBE_BATCH_COUNT } from '../core/IrradianceLightProbe';
+// import { PROBE_BATCH_COUNT } from '../core/IrradianceLightProbe';
 
 const DebugOverlayContext = React.createContext<THREE.Scene | null>(null);
 

@@ -57,6 +57,8 @@ export const LightmapIgnore: React.FC = ({ children }) => {
 export type SamplerSettings = Partial<LightProbeSettings>;
 
 export interface LightmapProps {
+  ao?: boolean;
+  aoDistance?: number;
   lightMapSize?: number | [number, number];
   textureFilter?: THREE.TextureFilter;
   texelsPerUnit?: number;
@@ -74,7 +76,15 @@ const Lightmap = React.forwardRef<
   React.PropsWithChildren<LightmapProps>
 >(
   (
-    { lightMapSize, textureFilter, texelsPerUnit, samplerSettings, children },
+    {
+      ao: aoMode,
+      aoDistance,
+      lightMapSize,
+      textureFilter,
+      texelsPerUnit,
+      samplerSettings,
+      children
+    },
     sceneRef
   ) => {
     // parse the convenience setting
@@ -92,10 +102,16 @@ const Lightmap = React.forwardRef<
     return (
       <>
         <IrradianceSceneManager
+          aoMode={!!aoMode}
+          aoDistance={aoDistance}
           initialWidth={initialWidth}
           initialHeight={initialHeight}
           textureFilter={textureFilter}
           texelsPerUnit={texelsPerUnit}
+          settings={{
+            ...DEFAULT_LIGHT_PROBE_SETTINGS,
+            ...samplerSettings
+          }}
         >
           {(workbench, startWorkbench) => (
             <LightmapProgressContext.Provider value={!isComplete}>
@@ -103,10 +119,6 @@ const Lightmap = React.forwardRef<
                 {workbench && !isComplete && (
                   <IrradianceRenderer
                     workbench={workbench}
-                    settings={{
-                      ...DEFAULT_LIGHT_PROBE_SETTINGS,
-                      ...samplerSettings
-                    }}
                     onComplete={() => {
                       setIsComplete(true);
                     }}

@@ -7,11 +7,26 @@ import React, {
 } from 'react';
 import * as THREE from 'three';
 
-import IrradianceAtlasMapper, {
-  Workbench,
-  AtlasMap
-} from './IrradianceAtlasMapper';
+import IrradianceAtlasMapper, { AtlasMap } from './IrradianceAtlasMapper';
+import { LightProbeSettings } from './IrradianceLightProbe';
 import { computeAutoUV2Layout } from './AutoUV2';
+
+export interface Workbench {
+  id: number; // for refresh
+
+  aoMode: boolean;
+  aoDistance: number;
+
+  lightScene: THREE.Scene;
+  atlasMap: AtlasMap;
+
+  // lightmap output
+  irradiance: THREE.Texture;
+  irradianceData: Float32Array;
+
+  // sampler settings
+  settings: LightProbeSettings;
+}
 
 export const IrradianceDebugContext = React.createContext<{
   atlasTexture: THREE.Texture;
@@ -20,6 +35,7 @@ export const IrradianceDebugContext = React.createContext<{
 
 const DEFAULT_LIGHTMAP_SIZE = 64;
 const DEFAULT_TEXELS_PER_UNIT = 2;
+const DEFAULT_AO_DISTANCE = 1.5;
 
 function createRendererTexture(
   atlasWidth: number,
@@ -47,26 +63,35 @@ function createRendererTexture(
 }
 
 const IrradianceSceneManager: React.FC<{
+  aoMode: boolean;
+  aoDistance?: number;
   initialWidth?: number;
   initialHeight?: number;
   textureFilter?: THREE.TextureFilter;
   texelsPerUnit?: number;
+  settings: LightProbeSettings;
   children: (
     workbench: Workbench | null,
     startWorkbench: (scene: THREE.Scene) => void
   ) => React.ReactNode;
 }> = ({
+  aoMode,
+  aoDistance,
   initialWidth,
   initialHeight,
   textureFilter,
   texelsPerUnit,
+  settings,
   children
 }) => {
   // read once
+  const aoModeRef = useRef(aoMode);
+  const aoDistanceRef = useRef(aoDistance);
   const initialWidthRef = useRef(initialWidth);
   const initialHeightRef = useRef(initialHeight);
   const textureFilterRef = useRef(textureFilter);
   const texelsPerUnitRef = useRef(texelsPerUnit); // read only once
+  const settingsRef = useRef(settings); // read only once
 
   // basic snapshot triggered by start handler
   const [workbenchBasics, setWorkbenchBasics] = useState<{
@@ -164,11 +189,17 @@ const IrradianceSceneManager: React.FC<{
       // save final copy of workbench
       setWorkbench({
         id: workbenchBasics.id,
+
+        aoMode: aoModeRef.current,
+        aoDistance: aoDistanceRef.current || DEFAULT_AO_DISTANCE,
+
         lightScene: workbenchBasics.scene,
         atlasMap,
 
         irradiance: lightMapBasics.irradiance,
-        irradianceData: lightMapBasics.irradianceData
+        irradianceData: lightMapBasics.irradianceData,
+
+        settings: settingsRef.current
       });
     },
     [workbenchBasics, lightMapBasics]
@@ -194,7 +225,6 @@ const IrradianceSceneManager: React.FC<{
           key={workbenchBasics.id} // re-create for new workbench
           width={lightMapBasics.width}
           height={lightMapBasics.height}
-          lightMap={lightMapBasics.irradiance}
           lightScene={workbenchBasics.scene}
           onComplete={atlasMapHandler}
         />
