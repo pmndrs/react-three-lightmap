@@ -41,7 +41,8 @@ export const Main: Story = () => (
             <meshLambertMaterial attach="material" color="#4080ff" />
           </mesh>
 
-          <ambientLight color="#ffffff" />
+          <pointLight color="#808080" position={[-3, 2, 5]} castShadow />
+          <ambientLight color="#808080" />
 
           <DebugOverlayWidgets />
         </Lightmap>
