@@ -220,6 +220,11 @@ function useScenePrep(
     // prepare the scene for baking
     const { lightScene, irradiance } = workbenchRef.current;
 
+    // ambient light for second pass of ambient occlusion
+    // (this lights the texels unmasked by previous AO passes for further propagation)
+    const aoSceneLight = new THREE.AmbientLight('#ffffff');
+    lightScene.add(aoSceneLight);
+
     // process relevant meshes
     const meshCleanupList: THREE.Mesh[] = [];
 
@@ -254,23 +259,25 @@ function useScenePrep(
         const stagingMaterial = new THREE.MeshPhongMaterial();
         stagingMaterial.alphaMap = material.alphaMap;
         stagingMaterial.alphaTest = material.alphaTest;
-        stagingMaterial.color = material.color;
-        stagingMaterial.emissive = material.emissive;
-        stagingMaterial.emissiveIntensity = material.emissiveIntensity;
-        stagingMaterial.emissiveMap = material.emissiveMap;
+        // stagingMaterial.color = material.color;
+        // stagingMaterial.emissive = material.emissive;
+        // stagingMaterial.emissiveIntensity = material.emissiveIntensity;
+        // stagingMaterial.emissiveMap = material.emissiveMap;
         stagingMaterial.flatShading = material.flatShading;
-        stagingMaterial.map = material.map;
+        // stagingMaterial.map = material.map;
         stagingMaterial.opacity = material.opacity;
         stagingMaterial.premultipliedAlpha = material.premultipliedAlpha;
-        stagingMaterial.shadowSide = material.shadowSide;
+        // stagingMaterial.shadowSide = material.shadowSide;
         stagingMaterial.side = material.side;
         stagingMaterial.transparent = material.transparent;
-        stagingMaterial.vertexColors = material.vertexColors;
+        // stagingMaterial.vertexColors = material.vertexColors;
         stagingMaterial.visible = material.visible;
 
         stagingMaterial.shininess = 0; // always fully diffuse
         stagingMaterial.toneMapped = false; // must output in raw linear space
-        stagingMaterial.lightMap = irradiance; // use the lightmap texture
+
+        // stagingMaterial.lightMap = irradiance; // use the lightmap texture
+        stagingMaterial.aoMap = irradiance; // use the AO texture
 
         mesh.material = stagingMaterial;
 
@@ -280,6 +287,9 @@ function useScenePrep(
     });
 
     return () => {
+      // remove the staging ambient light
+      lightScene.remove(aoSceneLight);
+
       // replace staging material with original
       meshCleanupList.forEach((mesh) => {
         // get stashed material and clean up object key
@@ -294,7 +304,8 @@ function useScenePrep(
           mesh.material = material;
 
           // also fill in the resulting map
-          material.lightMap = irradiance;
+          // material.lightMap = irradiance;
+          material.aoMap = irradiance;
         } else {
           console.error('lightmap baker: missing original material', mesh);
         }
