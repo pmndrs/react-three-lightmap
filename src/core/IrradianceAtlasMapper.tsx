@@ -96,10 +96,9 @@ export function traverseAtlasItems(
 const IrradianceAtlasMapper: React.FC<{
   width: number;
   height: number;
-  lightMap: THREE.Texture;
   lightScene: THREE.Scene;
   onComplete: (atlasMap: AtlasMap) => void;
-}> = ({ width, height, lightMap, lightScene, onComplete }) => {
+}> = ({ width, height, lightScene, onComplete }) => {
   // read value only on first render
   const widthRef = useRef(width);
   const heightRef = useRef(height);

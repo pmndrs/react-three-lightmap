@@ -194,7 +194,6 @@ const IrradianceSceneManager: React.FC<{
           key={workbenchBasics.id} // re-create for new workbench
           width={lightMapBasics.width}
           height={lightMapBasics.height}
-          lightMap={lightMapBasics.irradiance}
           lightScene={workbenchBasics.scene}
           onComplete={atlasMapHandler}
         />
