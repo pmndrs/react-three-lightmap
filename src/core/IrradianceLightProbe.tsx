@@ -22,10 +22,12 @@ export const PROBE_BATCH_COUNT = 8;
 
 export interface LightProbeSettings {
   targetSize: number;
+  offset: number;
 }
 
 export const DEFAULT_LIGHT_PROBE_SETTINGS: LightProbeSettings = {
-  targetSize: 16
+  targetSize: 16,
+  offset: 0
 };
 
 export type ProbeDataHandler = (
@@ -53,8 +55,8 @@ export type ProbeBatcher = (
   batchResultCallback: (batchIndex: number, reader: ProbeBatchReader) => void
 ) => void;
 
-// "raw" means that output is not normalized (not necessary for now)
-function setBlendedNormalRaw(
+// bilinear interpolation of normals in triangle, with normalization
+function setBlendedNormal(
   out: THREE.Vector3,
   origNormalArray: ArrayLike<number>,
   origIndexArray: ArrayLike<number>,
@@ -79,6 +81,8 @@ function setBlendedNormalRaw(
     origIndexArray[faceVertexBase + 2] * 3
   );
   out.addScaledVector(tmpNormalOther, pV);
+
+  out.normalize();
 }
 
 function setUpProbeUp(
@@ -266,7 +270,7 @@ export function useLightProbe(
 
         // compute normal and cardinal directions
         // (done per texel for linear interpolation of normals)
-        setBlendedNormalRaw(
+        setBlendedNormal(
           tmpNormal,
           origNormalArray,
           origIndexArray,
@@ -287,6 +291,9 @@ export function useLightProbe(
 
         tmpU.crossVectors(tmpNormal, tmpV);
         tmpU.normalize();
+
+        // nudge the light probe position based on requested offset
+        tmpOrigin.addScaledVector(tmpNormal, settings.offset);
 
         // proceed with the renders
         setUpProbeUp(probeCam, originalMesh, tmpOrigin, tmpNormal, tmpU);
