@@ -5,9 +5,9 @@
  *
  */
 
-import React from 'react';
+import React, { useRef } from 'react';
 import ReactDOM from 'react-dom';
-import { Canvas, useLoader } from 'react-three-fiber';
+import { Canvas, useLoader, useFrame } from 'react-three-fiber';
 import { OrbitControls, Html } from '@react-three/drei';
 import { Lightmap } from '@react-three/lightmap';
 import * as THREE from 'three';
@@ -24,6 +24,13 @@ const Scene = () => {
     THREE.FontLoader,
     'https://raw.githubusercontent.com/mrdoob/three.js/dev/examples/fonts/helvetiker_regular.typeface.json'
   );
+
+  const lightTurntableRef = useRef();
+  useFrame(({ clock }) => {
+    if (lightTurntableRef.current) {
+      lightTurntableRef.current.rotation.y = -clock.elapsedTime * 0.1;
+    }
+  });
 
   return (
     <group>
@@ -48,7 +55,9 @@ const Scene = () => {
         <meshLambertMaterial attach="material" color="#ff6080" />
       </mesh>
 
-      <directionalLight intensity={1.5} position={[-2, 2, 4]} castShadow />
+      <group ref={lightTurntableRef} position={[0, 0, 4]}>
+        <directionalLight intensity={1.5} position={[-3, 2, 0]} castShadow />
+      </group>
       <ambientLight color="#406040" />
     </group>
   );
