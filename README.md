@@ -1,6 +1,6 @@
 # react-three-lightmap
 
-**In-browser lightmap baker for react-three-fiber and ThreeJS.**
+**In-browser lightmap and ambient occlusion (AO map) baker for react-three-fiber and ThreeJS.**
 
 ![example screenshot of lightmap baker output](./react-three-lightmap-example.png)
 

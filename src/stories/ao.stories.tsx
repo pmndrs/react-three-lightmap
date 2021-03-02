@@ -9,7 +9,7 @@ import Spinner from './Spinner';
 import { DebugOverlayRenderer, DebugOverlayWidgets } from './DebugOverlayScene';
 
 export default {
-  title: 'Ambient occlusion',
+  title: 'Simple AO',
   parameters: {
     layout: 'fullscreen'
   },

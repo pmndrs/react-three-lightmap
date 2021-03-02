@@ -35,7 +35,7 @@ export const IrradianceDebugContext = React.createContext<{
 
 const DEFAULT_LIGHTMAP_SIZE = 64;
 const DEFAULT_TEXELS_PER_UNIT = 2;
-const DEFAULT_AO_DISTANCE = 1.5;
+const DEFAULT_AO_DISTANCE = 3;
 
 function createRendererTexture(
   atlasWidth: number,

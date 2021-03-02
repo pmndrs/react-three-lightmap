@@ -1,7 +1,18 @@
 {
   "name": "@react-three/lightmap",
   "version": "0.0.1",
-  "description": "In-browser lightmap baker for react-three-fiber and ThreeJS",
+  "description": "In-browser lightmap/AO baker for react-three-fiber and ThreeJS",
+  "keywords": [
+    "react",
+    "threejs",
+    "react-three-fiber",
+    "r3f",
+    "lightmap",
+    "lightmap-baker",
+    "ao",
+    "ambient occlusion",
+    "ao-baker"
+  ],
   "main": "dist/index.js",
   "module": "dist/lightmap.esm.js",
   "typings": "dist/index.d.ts",

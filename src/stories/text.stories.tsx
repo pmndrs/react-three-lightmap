@@ -23,19 +23,19 @@ const Scene: React.FC = () => {
   );
 
   return (
-    <Lightmap texelsPerUnit={4}>
+    <Lightmap ao texelsPerUnit={4}>
       <AutoUV2Ignore>
-        <mesh position={[0, 0, -2]} receiveShadow>
+        <mesh position={[0, 0, -1]} receiveShadow>
           <planeBufferGeometry attach="geometry" args={[20, 20]} />
           <meshPhongMaterial
             attach="material"
-            color="#808080"
+            color="#ffffff"
             //shininess={0}
           />
         </mesh>
       </AutoUV2Ignore>
 
-      <mesh position={[-2, -1, 0]} castShadow receiveShadow>
+      <mesh position={[-2.5, 1, 0]} rotation={[Math.PI / 2, 0, 0]} castShadow>
         <textBufferGeometry
           attach="geometry"
           args={[
@@ -48,17 +48,24 @@ const Scene: React.FC = () => {
             }
           ]}
         />
-        <meshPhongMaterial attach="material" color="#c0c0c0" />
+        <meshPhongMaterial
+          attach="material"
+          color="#e0e0e0"
+          aoMapIntensity={1.5}
+          shininess={1}
+        />
       </mesh>
 
       <spotLight
         angle={0.75}
         distance={25}
-        intensity={2}
         penumbra={0.5}
-        position={[-8, 8, 8]}
+        position={[0, 2.5, 12]}
+        color="#60656a"
+        intensity={2}
         castShadow
       />
+      <ambientLight color="#60656a" />
 
       <DebugOverlayWidgets />
     </Lightmap>
@@ -68,7 +75,7 @@ const Scene: React.FC = () => {
 export const Main: Story = () => (
   <Canvas
     colorManagement={false} // @todo reconsider
-    camera={{ position: [-6, -4, 4], up: [0, 0, 1] }}
+    camera={{ position: [2, -8, 1], up: [0, 0, 1] }}
     shadowMap
     onCreated={({ gl }) => {
       gl.toneMapping = THREE.ACESFilmicToneMapping;
