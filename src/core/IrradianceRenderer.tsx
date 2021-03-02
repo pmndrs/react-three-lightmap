@@ -185,6 +185,28 @@ function storeLightMapValue(
   }
 }
 
+type SupportedMaterial =
+  | THREE.MeshLambertMaterial
+  | THREE.MeshPhongMaterial
+  | THREE.MeshStandardMaterial
+  | THREE.MeshPhysicalMaterial;
+
+function materialIsSupported(
+  material: THREE.Material
+): material is SupportedMaterial {
+  return (
+    material instanceof THREE.MeshLambertMaterial ||
+    material instanceof THREE.MeshPhongMaterial ||
+    material instanceof THREE.MeshStandardMaterial ||
+    material instanceof THREE.MeshPhysicalMaterial
+  );
+}
+
+const ORIGINAL_MATERIAL_KEY = Symbol(
+  'lightmap baker: stashed original material'
+);
+type UserDataStore<T extends symbol, V> = Record<T, V | undefined>;
+
 function useScenePrep(
   workbenchRef: React.MutableRefObject<Workbench>,
   outputIsComplete: boolean
@@ -197,6 +219,9 @@ function useScenePrep(
 
     // prepare the scene for baking
     const { lightScene, irradiance } = workbenchRef.current;
+
+    // process relevant meshes
+    const meshCleanupList: THREE.Mesh[] = [];
 
     traverseAtlasItems(lightScene, (mesh) => {
       // simple check for type (no need to check for uv2 presence)
@@ -211,10 +236,7 @@ function useScenePrep(
       if (
         material &&
         !Array.isArray(material) &&
-        (material instanceof THREE.MeshLambertMaterial ||
-          material instanceof THREE.MeshPhongMaterial ||
-          material instanceof THREE.MeshStandardMaterial ||
-          material instanceof THREE.MeshPhysicalMaterial)
+        materialIsSupported(material)
       ) {
         if (material.lightMap && material.lightMap !== irradiance) {
           throw new Error(
@@ -222,12 +244,61 @@ function useScenePrep(
           );
         }
 
-        material.lightMap = irradiance;
+        // stash material to be replaced with ours
+        (mesh.userData as UserDataStore<
+          typeof ORIGINAL_MATERIAL_KEY,
+          SupportedMaterial
+        >)[ORIGINAL_MATERIAL_KEY] = material;
+
+        // clone sensible presentation properties
+        const stagingMaterial = new THREE.MeshPhongMaterial();
+        stagingMaterial.alphaMap = material.alphaMap;
+        stagingMaterial.alphaTest = material.alphaTest;
+        stagingMaterial.color = material.color;
+        stagingMaterial.emissive = material.emissive;
+        stagingMaterial.emissiveIntensity = material.emissiveIntensity;
+        stagingMaterial.emissiveMap = material.emissiveMap;
+        stagingMaterial.flatShading = material.flatShading;
+        stagingMaterial.map = material.map;
+        stagingMaterial.opacity = material.opacity;
+        stagingMaterial.premultipliedAlpha = material.premultipliedAlpha;
+        stagingMaterial.shadowSide = material.shadowSide;
+        stagingMaterial.side = material.side;
+        stagingMaterial.transparent = material.transparent;
+        stagingMaterial.vertexColors = material.vertexColors;
+        stagingMaterial.visible = material.visible;
+
+        stagingMaterial.shininess = 0; // always fully diffuse
+        stagingMaterial.toneMapped = false; // must output in raw linear space
+        stagingMaterial.lightMap = irradiance; // use the lightmap texture
+
+        mesh.material = stagingMaterial;
+
+        // keep a simple list for later cleanup
+        meshCleanupList.push(mesh);
       }
     });
 
     return () => {
-      // no-op for now
+      // replace staging material with original
+      meshCleanupList.forEach((mesh) => {
+        // get stashed material and clean up object key
+        const userData = mesh.userData as UserDataStore<
+          typeof ORIGINAL_MATERIAL_KEY,
+          SupportedMaterial
+        >;
+        const material = userData[ORIGINAL_MATERIAL_KEY];
+        delete userData[ORIGINAL_MATERIAL_KEY];
+
+        if (material) {
+          mesh.material = material;
+
+          // also fill in the resulting map
+          material.lightMap = irradiance;
+        } else {
+          console.error('lightmap baker: missing original material', mesh);
+        }
+      });
     };
   }, [outputIsComplete]);
 }
