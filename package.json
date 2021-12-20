@@ -15,7 +15,7 @@
   ],
   "main": "dist/index.js",
   "module": "dist/lightmap.esm.js",
-  "typings": "dist/index.d.ts",
+  "typings": "dist/entry.d.ts",
   "files": [
     "dist"
   ],
