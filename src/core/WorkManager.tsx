@@ -5,7 +5,7 @@ import React, {
   useCallback,
   useRef
 } from 'react';
-import { useFrame } from 'react-three-fiber';
+import { useFrame } from '@react-three/fiber';
 
 const WORK_PER_FRAME = 2;
 

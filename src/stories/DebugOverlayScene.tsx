@@ -4,7 +4,7 @@ import {
   useFrame,
   useThree,
   createPortal
-} from 'react-three-fiber';
+} from '@react-three/fiber';
 import * as THREE from 'three';
 
 import { IrradianceDebugContext } from '../core/IrradianceSceneManager';

@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
-import { useUpdate, useThree } from 'react-three-fiber';
+import { useUpdate, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 
 export interface AtlasMapItem {

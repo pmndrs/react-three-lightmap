@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
 import { Story, Meta } from '@storybook/react';
-import { useLoader, Canvas } from 'react-three-fiber';
+import { useLoader, Canvas } from '@react-three/fiber';
 import { OrbitControls } from '@react-three/drei';
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader';

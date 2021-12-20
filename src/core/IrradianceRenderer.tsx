@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useMemo, useContext, useRef } from 'react';
-import { useFrame } from 'react-three-fiber';
+import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 
 import { WorkManagerContext } from './WorkManager';

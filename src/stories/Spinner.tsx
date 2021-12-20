@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { useResource, useFrame } from 'react-three-fiber';
+import { useResource, useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 
 const Spinner: React.FC = () => {
