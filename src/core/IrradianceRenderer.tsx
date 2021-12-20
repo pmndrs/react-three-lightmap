@@ -274,8 +274,8 @@ function useScenePrep(
           stagingMaterial.displacementBias = material.displacementBias;
           stagingMaterial.displacementMap = material.displacementMap;
           stagingMaterial.displacementScale = material.displacementScale;
+          stagingMaterial.flatShading = material.flatShading;
         }
-        stagingMaterial.flatShading = material.flatShading;
         stagingMaterial.morphNormals = material.morphNormals;
         stagingMaterial.morphTargets = material.morphTargets;
         stagingMaterial.opacity = material.opacity;

@@ -74,9 +74,8 @@ const Scene: React.FC = () => {
 
 export const Main: Story = () => (
   <Canvas
-    colorManagement={false} // @todo reconsider
     camera={{ position: [2, -8, 1], up: [0, 0, 1] }}
-    shadowMap
+    shadows
     onCreated={({ gl }) => {
       gl.toneMapping = THREE.ACESFilmicToneMapping;
       gl.toneMappingExposure = 0.9;
