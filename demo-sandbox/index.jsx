@@ -7,7 +7,7 @@
 
 import React, { useRef } from 'react';
 import ReactDOM from 'react-dom';
-import { Canvas, useLoader, useFrame } from 'react-three-fiber';
+import { Canvas, useLoader, useFrame } from '@react-three/fiber';
 import { OrbitControls, Html } from '@react-three/drei';
 import { Lightmap } from '@react-three/lightmap';
 import * as THREE from 'three';
