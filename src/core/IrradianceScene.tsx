@@ -32,6 +32,8 @@ const FallbackListener: React.FC<{
   return <LocalSuspender />;
 };
 
+// this component wraps scene contents in a suspense listener
+// so that we can wait until it's done loading before starting actual baking
 const IrradianceScene = React.forwardRef<
   THREE.Scene | null,
   React.PropsWithChildren<{ onReady: (scene: THREE.Scene) => void }>

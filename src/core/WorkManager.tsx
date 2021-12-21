@@ -5,7 +5,7 @@ import React, {
   useCallback,
   useRef
 } from 'react';
-import { useFrame } from '@react-three/fiber';
+import { useThree, useFrame } from '@react-three/fiber';
 
 const WORK_PER_FRAME = 2;
 
@@ -67,6 +67,24 @@ function useJobInstance(
   }, [jobId, setJobs]);
 }
 
+function createRAF(cb: () => void) {
+  const signal = { stop: false };
+
+  function frame() {
+    if (signal.stop) {
+      return;
+    }
+
+    cb();
+    requestAnimationFrame(frame);
+  }
+
+  // kick off first frame
+  requestAnimationFrame(frame);
+
+  return signal;
+}
+
 // this simply acts as a central spot to schedule per-frame work
 // (allowing eventual possibility of e.g. multiple unrelated renderers co-existing within a single central work manager)
 const WorkManager: React.FC = ({ children }) => {
@@ -78,27 +96,34 @@ const WorkManager: React.FC = ({ children }) => {
   }, []);
 
   // actual per-frame work invocation
-  useFrame(({ gl }) => {
-    // get active job, if any
-    const activeJob = jobs.find((job) => !!job.callbackRef.current);
+  const { gl } = useThree();
+  useEffect(() => {
+    const signal = createRAF(() => {
+      // get active job, if any
+      const activeJob = jobs.find((job) => !!job.callbackRef.current);
 
-    // check if there is nothing to do
-    if (!activeJob) {
-      return;
-    }
-
-    // invoke work callback
-    for (let i = 0; i < WORK_PER_FRAME; i += 1) {
-      // check if callback is still around (might go away mid-batch)
-      const callback = activeJob.callbackRef.current;
-
-      if (!callback) {
+      // check if there is nothing to do
+      if (!activeJob) {
         return;
       }
 
-      callback(gl);
-    }
-  });
+      // invoke work callback
+      for (let i = 0; i < WORK_PER_FRAME; i += 1) {
+        // check if callback is still around (might go away mid-batch)
+        const callback = activeJob.callbackRef.current;
+
+        if (!callback) {
+          return;
+        }
+
+        callback(gl);
+      }
+    });
+
+    return () => {
+      signal.stop = true;
+    };
+  }, [gl, jobs]);
 
   return (
     <>
