@@ -98,6 +98,7 @@ const MainSceneContents: React.FC = () => {
 
 export const Main: Story = () => (
   <Canvas
+    mode="legacy"
     camera={{ position: [-4, -4, 8], up: [0, 0, 1] }}
     shadows
     onCreated={({ gl }) => {
