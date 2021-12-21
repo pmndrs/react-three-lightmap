@@ -1,5 +1,11 @@
-import React, { useState, useMemo, useEffect, useRef } from 'react';
-import { useUpdate, useThree } from 'react-three-fiber';
+import React, {
+  useState,
+  useMemo,
+  useEffect,
+  useRef,
+  useLayoutEffect
+} from 'react';
+import { useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 
 export interface AtlasMapItem {
@@ -231,62 +237,60 @@ const IrradianceAtlasMapper: React.FC<{
 
   // render the output as needed
   const { gl } = useThree();
-  const orthoSceneRef = useUpdate<THREE.Scene>(
-    (orthoScene) => {
-      // nothing to do
-      if (!inputItems || isComplete) {
-        return;
-      }
+  const orthoSceneRef = useRef<THREE.Scene>();
 
-      // save existing renderer state
-      const prevClearColor = new THREE.Color();
-      gl.getClearColor(prevClearColor);
-      const prevClearAlpha = gl.getClearAlpha();
-      const prevAutoClear = gl.autoClear;
+  useLayoutEffect(() => {
+    // nothing to do
+    const orthoScene = orthoSceneRef.current;
+    if (!inputItems || isComplete || !orthoScene) {
+      return;
+    }
 
-      // produce the output
-      gl.setRenderTarget(orthoTarget);
+    // save existing renderer state
+    const prevClearColor = new THREE.Color();
+    gl.getClearColor(prevClearColor);
+    const prevClearAlpha = gl.getClearAlpha();
+    const prevAutoClear = gl.autoClear;
 
-      gl.setClearColor(ATLAS_BG_COLOR, 0); // alpha must be zero
-      gl.autoClear = true;
+    // produce the output
+    gl.setRenderTarget(orthoTarget);
 
-      gl.render(orthoScene, orthoCamera);
+    gl.setClearColor(ATLAS_BG_COLOR, 0); // alpha must be zero
+    gl.autoClear = true;
 
-      // restore previous renderer state
-      gl.setRenderTarget(null);
-      gl.setClearColor(prevClearColor, prevClearAlpha);
-      gl.autoClear = prevAutoClear;
+    gl.render(orthoScene, orthoCamera);
 
-      gl.readRenderTargetPixels(
-        orthoTarget,
-        0,
-        0,
-        widthRef.current,
-        heightRef.current,
-        orthoData
-      );
+    // restore previous renderer state
+    gl.setRenderTarget(null);
+    gl.setClearColor(prevClearColor, prevClearAlpha);
+    gl.autoClear = prevAutoClear;
 
-      setIsComplete(true);
-      setInputItems(null); // release references to atlas-specific geometry clones
+    gl.readRenderTargetPixels(
+      orthoTarget,
+      0,
+      0,
+      widthRef.current,
+      heightRef.current,
+      orthoData
+    );
 
-      onComplete({
-        width: widthRef.current,
-        height: heightRef.current,
-        texture: orthoTarget.texture,
-        data: orthoData,
+    setIsComplete(true);
+    setInputItems(null); // release references to atlas-specific geometry clones
 
-        // no need to expose references to atlas-specific geometry clones
-        items: inputItems.map(
-          ({ faceCount, originalMesh, originalBuffer }) => ({
-            faceCount,
-            originalMesh,
-            originalBuffer
-          })
-        )
-      });
-    },
-    [inputItems]
-  );
+    onComplete({
+      width: widthRef.current,
+      height: heightRef.current,
+      texture: orthoTarget.texture,
+      data: orthoData,
+
+      // no need to expose references to atlas-specific geometry clones
+      items: inputItems.map(({ faceCount, originalMesh, originalBuffer }) => ({
+        faceCount,
+        originalMesh,
+        originalBuffer
+      }))
+    });
+  }, [inputItems]);
 
   return (
     <>

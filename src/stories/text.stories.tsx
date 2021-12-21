@@ -1,6 +1,6 @@
 import React from 'react';
 import { Story, Meta } from '@storybook/react';
-import { Canvas, useLoader } from 'react-three-fiber';
+import { Canvas, useLoader } from '@react-three/fiber';
 import { OrbitControls } from '@react-three/drei';
 import * as THREE from 'three';
 
@@ -74,9 +74,9 @@ const Scene: React.FC = () => {
 
 export const Main: Story = () => (
   <Canvas
-    colorManagement={false} // @todo reconsider
+    mode="legacy"
     camera={{ position: [2, -8, 1], up: [0, 0, 1] }}
-    shadowMap
+    shadows
     onCreated={({ gl }) => {
       gl.toneMapping = THREE.ACESFilmicToneMapping;
       gl.toneMappingExposure = 0.9;

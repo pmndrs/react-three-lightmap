@@ -1,9 +1,9 @@
-import React, { useState, useMemo } from 'react';
-import { useResource, useFrame } from 'react-three-fiber';
+import React, { useState, useMemo, useRef } from 'react';
+import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 
 const Spinner: React.FC = () => {
-  const meshRef = useResource<THREE.Mesh>();
+  const meshRef = useRef<THREE.Mesh>();
 
   useFrame(({ clock }) => {
     // @todo meshRef.current can be undefined on unmount, fix upstream

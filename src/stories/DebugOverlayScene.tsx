@@ -1,10 +1,5 @@
-import React, { useMemo, useContext } from 'react';
-import {
-  useResource,
-  useFrame,
-  useThree,
-  createPortal
-} from 'react-three-fiber';
+import React, { useMemo, useContext, useRef } from 'react';
+import { useFrame, useThree, createPortal } from '@react-three/fiber';
 import * as THREE from 'three';
 
 import { IrradianceDebugContext } from '../core/IrradianceSceneManager';
@@ -14,8 +9,8 @@ const DebugOverlayContext = React.createContext<THREE.Scene | null>(null);
 
 // set up a special render loop with a debug overlay for various widgets (see below)
 export const DebugOverlayRenderer: React.FC = ({ children }) => {
-  const mainSceneRef = useResource<THREE.Scene>();
-  const debugSceneRef = useResource<THREE.Scene>();
+  const mainSceneRef = useRef<THREE.Scene>();
+  const debugSceneRef = useRef<THREE.Scene>();
 
   const { size } = useThree();
   const debugCamera = useMemo(() => {
@@ -25,13 +20,13 @@ export const DebugOverlayRenderer: React.FC = ({ children }) => {
   }, [size]);
 
   useFrame(({ gl, camera }) => {
-    gl.render(mainSceneRef.current, camera);
+    gl.render(mainSceneRef.current!, camera);
   }, 20);
 
   useFrame(({ gl }) => {
     gl.autoClear = false;
     gl.clearDepth();
-    gl.render(debugSceneRef.current, debugCamera);
+    gl.render(debugSceneRef.current!, debugCamera);
     gl.autoClear = true;
   }, 30);
 

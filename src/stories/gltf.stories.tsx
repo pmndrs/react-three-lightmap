@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
 import { Story, Meta } from '@storybook/react';
-import { useLoader, Canvas } from 'react-three-fiber';
+import { useLoader, Canvas } from '@react-three/fiber';
 import { OrbitControls } from '@react-three/drei';
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader';
@@ -98,9 +98,9 @@ const MainSceneContents: React.FC = () => {
 
 export const Main: Story = () => (
   <Canvas
-    colorManagement={false} // @todo reconsider
+    mode="legacy"
     camera={{ position: [-4, -4, 8], up: [0, 0, 1] }}
-    shadowMap
+    shadows
     onCreated={({ gl }) => {
       gl.toneMapping = THREE.ACESFilmicToneMapping;
       gl.toneMappingExposure = 0.9;

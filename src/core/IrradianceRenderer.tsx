@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useMemo, useContext, useRef } from 'react';
-import { useFrame } from 'react-three-fiber';
+import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 
 import { WorkManagerContext } from './WorkManager';
@@ -261,10 +261,12 @@ function useScenePrep(
         }
 
         // stash material to be replaced with ours
-        (mesh.userData as UserDataStore<
-          typeof ORIGINAL_MATERIAL_KEY,
-          SupportedMaterial
-        >)[ORIGINAL_MATERIAL_KEY] = material;
+        (
+          mesh.userData as UserDataStore<
+            typeof ORIGINAL_MATERIAL_KEY,
+            SupportedMaterial
+          >
+        )[ORIGINAL_MATERIAL_KEY] = material;
 
         // clone sensible presentation properties
         const stagingMaterial = new THREE.MeshPhongMaterial();
@@ -274,8 +276,8 @@ function useScenePrep(
           stagingMaterial.displacementBias = material.displacementBias;
           stagingMaterial.displacementMap = material.displacementMap;
           stagingMaterial.displacementScale = material.displacementScale;
+          stagingMaterial.flatShading = material.flatShading;
         }
-        stagingMaterial.flatShading = material.flatShading;
         stagingMaterial.morphNormals = material.morphNormals;
         stagingMaterial.morphTargets = material.morphTargets;
         stagingMaterial.opacity = material.opacity;
@@ -392,7 +394,9 @@ const IrradianceRenderer: React.FC<{
     const { width: atlasWidth, height: atlasHeight } = atlasMap;
     const totalTexelCount = atlasWidth * atlasHeight;
 
-    const result = new Array<number>(totalTexelCount);
+    const result = new Array<number>(totalTexelCount) as number[] & {
+      pickMapReady?: boolean;
+    };
 
     // perform main fill in separate tick for responsiveness
     setTimeout(() => {
@@ -415,6 +419,9 @@ const IrradianceRenderer: React.FC<{
           result[index] = sequenceElement;
         }
       }
+
+      // signal completion
+      result.pickMapReady = true;
     }, 0);
 
     return result;
@@ -497,18 +504,15 @@ const IrradianceRenderer: React.FC<{
     outputIsComplete
       ? null
       : (gl) => {
-          const {
-            passTexelCounter,
-            passOutput,
-            passOutputData
-          } = processingState;
+          const { passTexelCounter, passOutput, passOutputData } =
+            processingState;
 
           const { atlasMap } = workbenchRef.current;
           const { width: atlasWidth, height: atlasHeight } = atlasMap;
           const totalTexelCount = atlasWidth * atlasHeight;
 
           // wait for lookup map to be built up
-          if (texelPickMap.length !== totalTexelCount) {
+          if (!texelPickMap.pickMapReady) {
             return;
           }
 
@@ -575,14 +579,12 @@ const IrradianceRenderer: React.FC<{
   );
 
   // debug probe
-  const {
-    renderLightProbeBatch: debugProbeBatch,
-    debugLightProbeTexture
-  } = useLightProbe(
-    workbenchRef.current.aoMode,
-    workbenchRef.current.aoDistance,
-    workbenchRef.current.settings
-  );
+  const { renderLightProbeBatch: debugProbeBatch, debugLightProbeTexture } =
+    useLightProbe(
+      workbenchRef.current.aoMode,
+      workbenchRef.current.aoDistance,
+      workbenchRef.current.settings
+    );
   const debugProbeRef = useRef(false);
   useFrame(({ gl }) => {
     // run only once
