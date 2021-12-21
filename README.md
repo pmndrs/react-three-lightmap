@@ -4,7 +4,9 @@
 
 ![example screenshot of lightmap baker output](./react-three-lightmap-example.png)
 
-[Live editable sandbox](https://codesandbox.io/s/github/pmndrs/react-three-lightmap/tree/main/demo-sandbox).
+[See example live editable sandbox](https://codesandbox.io/s/github/pmndrs/react-three-lightmap/tree/main/demo-sandbox).
+
+NOTE: add `mode="legacy"` to your `<Canvas>` tag to enable legacy React suspense mode in r3f, this is a current limitation of the library.
 
 ## Local Development
 

@@ -65,9 +65,9 @@ const Scene = () => {
 
 ReactDOM.render(
   <Canvas
-    colorManagement={false} // @todo reconsider
+    mode="legacy" // legacy suspense mode is required
     camera={{ position: [-2, -4, 6], up: [0, 0, 1] }}
-    shadowMap
+    shadows
     onCreated={({ gl }) => {
       gl.toneMapping = THREE.ACESFilmicToneMapping;
       gl.toneMappingExposure = 0.9;
