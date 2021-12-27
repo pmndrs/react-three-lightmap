@@ -16,6 +16,7 @@ export interface Workbench {
 
   aoMode: boolean;
   aoDistance: number;
+  emissiveMultiplier: number;
 
   lightScene: THREE.Scene;
   atlasMap: AtlasMap;
@@ -36,6 +37,11 @@ export const IrradianceDebugContext = React.createContext<{
 const DEFAULT_LIGHTMAP_SIZE = 64;
 const DEFAULT_TEXELS_PER_UNIT = 2;
 const DEFAULT_AO_DISTANCE = 3;
+
+// global conversion of display -> physical emissiveness
+// this is useful because emissive textures normally do not produce enough light to bounce to scene,
+// and simply increasing their emissiveIntensity would wash out the user-visible display colours
+const DEFAULT_EMISSIVE_MULTIPLIER = 32;
 
 function createRendererTexture(
   atlasWidth: number,
@@ -65,6 +71,7 @@ function createRendererTexture(
 const IrradianceSceneManager: React.FC<{
   aoMode: boolean;
   aoDistance?: number;
+  emissiveMultiplier?: number;
   initialWidth?: number;
   initialHeight?: number;
   textureFilter?: THREE.TextureFilter;
@@ -77,6 +84,7 @@ const IrradianceSceneManager: React.FC<{
 }> = ({
   aoMode,
   aoDistance,
+  emissiveMultiplier,
   initialWidth,
   initialHeight,
   textureFilter,
@@ -87,6 +95,7 @@ const IrradianceSceneManager: React.FC<{
   // read once
   const aoModeRef = useRef(aoMode);
   const aoDistanceRef = useRef(aoDistance);
+  const emissiveMultiplierRef = useRef(emissiveMultiplier);
   const initialWidthRef = useRef(initialWidth);
   const initialHeightRef = useRef(initialHeight);
   const textureFilterRef = useRef(textureFilter);
@@ -192,6 +201,10 @@ const IrradianceSceneManager: React.FC<{
 
         aoMode: aoModeRef.current,
         aoDistance: aoDistanceRef.current || DEFAULT_AO_DISTANCE,
+        emissiveMultiplier:
+          emissiveMultiplierRef.current === undefined
+            ? DEFAULT_EMISSIVE_MULTIPLIER
+            : emissiveMultiplierRef.current,
 
         lightScene: workbenchBasics.scene,
         atlasMap,

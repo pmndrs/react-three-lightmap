@@ -13,11 +13,6 @@ import {
 
 const MAX_PASSES = 2;
 
-// global conversion of display -> physical emissiveness
-// @todo this originally was 32 because emissive textures did not reflect enough scene light,
-// but making emissiveIntensity > 1 washed out the visible non-light-scene display colours
-// const EMISSIVE_MULTIPLIER = 1;
-
 const tmpRgba = new THREE.Vector4();
 
 // applied inside the light probe scene
@@ -214,7 +209,8 @@ function useScenePrep(
     }
 
     // prepare the scene for baking
-    const { aoMode, lightScene, irradiance } = workbenchRef.current;
+    const { aoMode, emissiveMultiplier, lightScene, irradiance } =
+      workbenchRef.current;
 
     // process relevant meshes
     const meshCleanupList: THREE.Mesh[] = [];
@@ -293,7 +289,8 @@ function useScenePrep(
           stagingMaterial.aoMapIntensity = material.aoMapIntensity;
           stagingMaterial.color = material.color;
           stagingMaterial.emissive = material.emissive;
-          stagingMaterial.emissiveIntensity = material.emissiveIntensity;
+          stagingMaterial.emissiveIntensity =
+            material.emissiveIntensity * emissiveMultiplier;
           stagingMaterial.emissiveMap = material.emissiveMap;
           stagingMaterial.map = material.map;
           stagingMaterial.shadowSide = material.shadowSide;

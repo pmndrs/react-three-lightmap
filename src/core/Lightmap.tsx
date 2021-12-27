@@ -59,6 +59,7 @@ export type SamplerSettings = Partial<LightProbeSettings>;
 export interface LightmapProps {
   ao?: boolean;
   aoDistance?: number;
+  emissiveMultiplier?: number;
   lightMapSize?: number | [number, number];
   textureFilter?: THREE.TextureFilter;
   texelsPerUnit?: number;
@@ -79,6 +80,7 @@ const Lightmap = React.forwardRef<
     {
       ao: aoMode,
       aoDistance,
+      emissiveMultiplier,
       lightMapSize,
       textureFilter,
       texelsPerUnit,
@@ -104,6 +106,7 @@ const Lightmap = React.forwardRef<
         <IrradianceSceneManager
           aoMode={!!aoMode}
           aoDistance={aoDistance}
+          emissiveMultiplier={emissiveMultiplier}
           initialWidth={initialWidth}
           initialHeight={initialHeight}
           textureFilter={textureFilter}
