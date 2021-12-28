@@ -187,6 +187,35 @@ function storeLightMapValue(
   }
 }
 
+// iterate through all texels
+function* getTexels(workbench: Workbench) {
+  const { atlasMap } = workbench;
+  const { width: atlasWidth, height: atlasHeight } = atlasMap;
+  const totalTexelCount = atlasWidth * atlasHeight;
+
+  let texelCount = 0;
+
+  let retryCount = 0;
+  while (texelCount < totalTexelCount) {
+    // get current texel info and increment
+    const currentCounter = texelCount;
+    texelCount += 1;
+
+    const texelInfo = getTexelInfo(atlasMap, currentCounter);
+
+    // try to keep looking for a reasonable number of cycles
+    // before yielding empty result
+    if (!texelInfo && retryCount < 100) {
+      retryCount += 1;
+      continue;
+    }
+
+    // yield out with either a found texel or nothing
+    retryCount = 0;
+    yield texelInfo;
+  }
+}
+
 // individual renderer worker lifecycle instance
 // (in parent, key to workbench.id to restart on changes)
 // @todo report completed flag
@@ -208,7 +237,7 @@ const IrradianceRenderer: React.FC<{
     return {
       passOutput: undefined as THREE.Texture | undefined, // current pass's output
       passOutputData: undefined as Float32Array | undefined, // current pass's output data
-      passTexelCounter: [0], // directly changed in place to avoid re-renders
+      passTexelIterator: getTexels(workbenchRef.current), // texel iterator state
       passComplete: true, // this triggers new pass on next render
       passesRemaining: MAX_PASSES
     };
@@ -259,7 +288,7 @@ const IrradianceRenderer: React.FC<{
       return {
         passOutput,
         passOutputData,
-        passTexelCounter: [0],
+        passTexelIterator: getTexels(workbenchRef.current),
         passComplete: false,
         passesRemaining: prev.passesRemaining - 1
       };
@@ -291,7 +320,7 @@ const IrradianceRenderer: React.FC<{
     outputIsComplete
       ? null
       : (gl) => {
-          const { passTexelCounter, passOutput, passOutputData } =
+          const { passTexelIterator, passOutput, passOutputData } =
             processingState;
 
           const { atlasMap } = workbenchRef.current;
@@ -302,6 +331,8 @@ const IrradianceRenderer: React.FC<{
             throw new Error('unexpected missing output');
           }
 
+          let texelsDone = false; // intercept whether there are more texels in this pass
+
           for (const {
             texelIndex,
             partsReader: readLightProbe
@@ -309,30 +340,14 @@ const IrradianceRenderer: React.FC<{
             gl,
             workbenchRef.current.lightScene,
             () => {
-              // allow for skipping a certain amount of empty texels
-              const maxCounter = Math.min(
-                totalTexelCount,
-                passTexelCounter[0] + 100
-              );
+              const result = passTexelIterator.next();
 
-              // keep trying texels until non-empty one is found
-              while (passTexelCounter[0] < maxCounter) {
-                const currentCounter = passTexelCounter[0];
-
-                // always update texel count
-                passTexelCounter[0] += 1;
-
-                // see if we can render this next texel
-                const texelInfo = getTexelInfo(atlasMap, currentCounter);
-                if (!texelInfo) {
-                  continue;
-                }
-
-                // if something was found, render it and stop looking
-                return texelInfo;
+              if (result.done) {
+                texelsDone = true;
+                return null;
               }
 
-              return null;
+              return result.value;
             }
           )) {
             readTexel(tmpRgba, readLightProbe, probePixelAreaLookup);
@@ -345,11 +360,14 @@ const IrradianceRenderer: React.FC<{
               texelIndex,
               passOutputData
             );
+
+            // make sure this shows up on next bounce pass
+            // @todo move?
             passOutput.needsUpdate = true;
           }
 
           // mark state as completed once all texels are done
-          if (passTexelCounter[0] >= totalTexelCount) {
+          if (texelsDone) {
             setProcessingState((prev) => {
               return {
                 ...prev,
