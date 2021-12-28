@@ -204,46 +204,6 @@ const IrradianceRenderer: React.FC<{
   const onDebugLightProbeRef = useRef(props.onDebugLightProbe);
   onDebugLightProbeRef.current = props.onDebugLightProbe;
 
-  // texel indexes for randomized processing (literally just a randomly shuffled index array)
-  // @todo is this relevant anymore?
-  const texelPickMap = useMemo(() => {
-    const { atlasMap } = workbenchRef.current;
-    const { width: atlasWidth, height: atlasHeight } = atlasMap;
-    const totalTexelCount = atlasWidth * atlasHeight;
-
-    const result = new Array<number>(totalTexelCount) as number[] & {
-      pickMapReady?: boolean;
-    };
-
-    // perform main fill in separate tick for responsiveness
-    setTimeout(() => {
-      const originalSequence = new Array<number>(totalTexelCount);
-
-      // nested loop to avoid tripping sandbox infinite loop detection
-      for (let i = 0; i < atlasHeight; i += 1) {
-        for (let j = 0; j < atlasWidth; j += 1) {
-          const index = i * atlasWidth + j;
-          originalSequence[index] = index;
-        }
-      }
-
-      // nested loop to avoid tripping sandbox infinite loop detection
-      for (let i = 0; i < atlasHeight; i += 1) {
-        for (let j = 0; j < atlasWidth; j += 1) {
-          const index = i * atlasWidth + j;
-          const randomIndex = Math.random() * originalSequence.length;
-          const sequenceElement = originalSequence.splice(randomIndex, 1)[0];
-          result[index] = sequenceElement;
-        }
-      }
-
-      // signal completion
-      result.pickMapReady = true;
-    }, 0);
-
-    return result;
-  }, []);
-
   const [processingState, setProcessingState] = useState(() => {
     return {
       passOutput: undefined as THREE.Texture | undefined, // current pass's output
@@ -338,11 +298,6 @@ const IrradianceRenderer: React.FC<{
           const { width: atlasWidth, height: atlasHeight } = atlasMap;
           const totalTexelCount = atlasWidth * atlasHeight;
 
-          // wait for lookup map to be built up
-          if (!texelPickMap.pickMapReady) {
-            return;
-          }
-
           if (!passOutputData || !passOutput) {
             throw new Error('unexpected missing output');
           }
@@ -368,10 +323,7 @@ const IrradianceRenderer: React.FC<{
                 passTexelCounter[0] += 1;
 
                 // see if we can render this next texel
-                const texelInfo = getTexelInfo(
-                  atlasMap,
-                  texelPickMap[currentCounter]
-                );
+                const texelInfo = getTexelInfo(atlasMap, currentCounter);
                 if (!texelInfo) {
                   continue;
                 }
