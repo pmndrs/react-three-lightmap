@@ -35,13 +35,13 @@ export const DEFAULT_LIGHT_PROBE_SETTINGS: LightProbeSettings = {
   far: 50
 };
 
-export type ProbeDataHandler = (
-  rgbaData: Float32Array,
-  rowPixelStride: number,
-  probeBox: THREE.Vector4,
-  originX: number, // device coordinates of lower-left corner of the viewbox
-  originY: number
-) => void;
+export type ProbeDataReport = {
+  rgbaData: Float32Array;
+  rowPixelStride: number;
+  probeBox: THREE.Vector4;
+  originX: number; // device coordinates of lower-left corner of the viewbox
+  originY: number;
+};
 
 export type ProbeBatchRenderer = (
   texelIndex: number,
@@ -51,7 +51,7 @@ export type ProbeBatchRenderer = (
   pV: number
 ) => void;
 
-export type ProbeBatchReader = (handleProbeData: ProbeDataHandler) => void;
+export type ProbeBatchReader = () => Generator<ProbeDataReport>;
 
 export type ProbeBatcher = (
   gl: THREE.WebGLRenderer,
@@ -418,21 +418,32 @@ export function useLightProbe(
         break;
       }
 
-      batchResultCallback(renderedTexelIndex, (handleProbeData) => {
-        // each batch is 2 tiles high
-        const batchOffsetY = batchItem * probeTargetSize * 2;
-        const rowPixelStride = probeTargetSize * 4;
+      // each batch is 2 tiles high
+      const batchOffsetY = batchItem * probeTargetSize * 2;
+      const rowPixelStride = probeTargetSize * 4;
+      const probeDataReport: ProbeDataReport = {
+        rgbaData: probeData,
+        rowPixelStride,
+        probeBox: tmpProbeBox,
+        originX: 0, // filled in later
+        originY: 0
+      };
 
+      batchResultCallback(renderedTexelIndex, function* () {
         tmpProbeBox.set(
           0,
           batchOffsetY + probeTargetSize,
           probeTargetSize,
           probeTargetSize
         );
-        handleProbeData(probeData, rowPixelStride, tmpProbeBox, 0, 0);
+        probeDataReport.originX = 0;
+        probeDataReport.originY = 0;
+        yield probeDataReport;
 
         tmpProbeBox.set(0, batchOffsetY + halfSize, probeTargetSize, halfSize);
-        handleProbeData(probeData, rowPixelStride, tmpProbeBox, 0, halfSize);
+        probeDataReport.originX = 0;
+        probeDataReport.originX = halfSize;
+        yield probeDataReport;
 
         tmpProbeBox.set(
           probeTargetSize,
@@ -440,7 +451,9 @@ export function useLightProbe(
           probeTargetSize,
           halfSize
         );
-        handleProbeData(probeData, rowPixelStride, tmpProbeBox, 0, halfSize);
+        probeDataReport.originX = 0;
+        probeDataReport.originX = halfSize;
+        yield probeDataReport;
 
         tmpProbeBox.set(
           probeTargetSize * 2,
@@ -448,7 +461,9 @@ export function useLightProbe(
           probeTargetSize,
           halfSize
         );
-        handleProbeData(probeData, rowPixelStride, tmpProbeBox, 0, halfSize);
+        probeDataReport.originX = 0;
+        probeDataReport.originX = halfSize;
+        yield probeDataReport;
 
         tmpProbeBox.set(
           probeTargetSize * 3,
@@ -456,7 +471,9 @@ export function useLightProbe(
           probeTargetSize,
           halfSize
         );
-        handleProbeData(probeData, rowPixelStride, tmpProbeBox, 0, halfSize);
+        probeDataReport.originX = 0;
+        probeDataReport.originX = halfSize;
+        yield probeDataReport;
       });
     }
   };

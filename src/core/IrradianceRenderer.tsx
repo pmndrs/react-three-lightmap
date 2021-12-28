@@ -95,7 +95,13 @@ function readTexel(
     b = 0,
     totalDivider = 0;
 
-  readLightProbe((probeData, rowPixelStride, box, originX, originY) => {
+  for (const {
+    rgbaData: probeData,
+    rowPixelStride,
+    probeBox: box,
+    originX,
+    originY
+  } of readLightProbe()) {
     const probeTargetSize = box.z; // assuming width is always full
 
     const rowStride = rowPixelStride * 4;
@@ -123,7 +129,7 @@ function readTexel(
       rowStart += rowStride;
       py += 1;
     }
-  });
+  }
 
   // alpha is set later
   rgba.x = r / totalDivider;
