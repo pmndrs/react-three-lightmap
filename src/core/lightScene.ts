@@ -24,7 +24,10 @@ const ORIGINAL_MATERIAL_KEY = Symbol(
 );
 type UserDataStore<T extends symbol, V> = Record<T, V | undefined>;
 
-export function performSceneSetup(workbench: Workbench) {
+export async function withLightScene(
+  workbench: Workbench,
+  taskCallback: () => Promise<void>
+) {
   // prepare the scene for baking
   const { aoMode, emissiveMultiplier, lightScene, irradiance } = workbench;
 
@@ -138,7 +141,10 @@ export function performSceneSetup(workbench: Workbench) {
     lightScene.add(aoSceneLight);
   }
 
-  return () => {
+  // perform main task and then clean up regardless of error state
+  try {
+    await taskCallback();
+  } finally {
     // remove the staging ambient light
     if (aoSceneLight) {
       lightScene.remove(aoSceneLight);
@@ -172,5 +178,5 @@ export function performSceneSetup(workbench: Workbench) {
         console.error('lightmap baker: missing original material', mesh);
       }
     });
-  };
+  }
 }

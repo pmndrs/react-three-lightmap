@@ -11,7 +11,7 @@ import * as THREE from 'three';
 import { useWorkManager, WorkCallback } from './WorkManager';
 import { AtlasMap } from './IrradianceAtlasMapper';
 import { Workbench } from './IrradianceSceneManager';
-import { performSceneSetup } from './lightScene';
+import { withLightScene } from './lightScene';
 import {
   ProbeTexel,
   ProbeBatchReader,
@@ -298,13 +298,6 @@ const IrradianceRenderer: React.FC<{
       return () => undefined;
     }
 
-    const cleanup = performSceneSetup(workbenchRef.current);
-
-    return cleanup;
-  }, [outputIsComplete]);
-
-  // kick off work
-  useEffect(() => {
     async function runBakingPasses(workbench: Workbench) {
       const { atlasMap, irradiance, irradianceData } = workbench;
       const { width: atlasWidth, height: atlasHeight } = atlasMap;
@@ -314,13 +307,13 @@ const IrradianceRenderer: React.FC<{
         // set up a new output texture for new pass
         // @todo this might not even need to be a texture? but could be useful for live debug display
         const [passOutput, passOutputData] = createTemporaryLightMapTexture(
-          workbenchRef.current.atlasMap.width,
-          workbenchRef.current.atlasMap.height
+          atlasMap.width,
+          atlasMap.height
         );
 
         // main work iteration
         let texelsDone = false;
-        const texelIterator = getTexels(workbenchRef.current, () => {
+        const texelIterator = getTexels(workbench, () => {
           texelsDone = true;
         });
 
@@ -332,7 +325,7 @@ const IrradianceRenderer: React.FC<{
             partsReader: readLightProbe
           } of probeRef.current!.renderLightProbeBatch(
             gl,
-            workbenchRef.current.lightScene,
+            workbench.lightScene,
             texelIterator
           )) {
             readTexel(tmpRgba, readLightProbe, probePixelAreaLookup);
@@ -362,11 +355,27 @@ const IrradianceRenderer: React.FC<{
       }
     }
 
-    // @todo unmounted check
-    runBakingPasses(workbenchRef.current).then(() => {
-      setOutputIsComplete(true);
+    const workbench = workbenchRef.current;
+
+    // track unmount inside a promise
+    let unmountedCb = () => {};
+    const whenUnmounted = new Promise<void>((resolve) => {
+      unmountedCb = resolve;
     });
-  }, [requestWork]);
+
+    withLightScene(workbench, () =>
+      // kick off work but break out before baking is complete if unmounted early
+      // @todo stop the baker as well - though requestWork will already stop returning
+      Promise.race([
+        whenUnmounted,
+        runBakingPasses(workbench).then(() => {
+          setOutputIsComplete(true);
+        })
+      ])
+    );
+
+    return () => unmountedCb();
+  }, [outputIsComplete, requestWork]);
 
   // debug probe @todo rewrite
   /*
