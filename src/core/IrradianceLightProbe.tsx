@@ -1,8 +1,6 @@
 import { useEffect, useMemo } from 'react';
 import * as THREE from 'three';
 
-import { AtlasMapItem } from './IrradianceAtlasMapper';
-
 const tmpOrigin = new THREE.Vector3();
 const tmpU = new THREE.Vector3();
 const tmpV = new THREE.Vector3();
@@ -57,12 +55,11 @@ export type ProbeBatchReader = () => Generator<ProbeDataReport>;
 export type ProbeBatcher = (
   gl: THREE.WebGLRenderer,
   lightScene: THREE.Scene,
-  batchItemGetter: () => ProbeTexel,
-  batchResultCallback: (
-    texelIndex: number,
-    partsReader: ProbeBatchReader
-  ) => void
-) => void;
+  batchItemGetter: () => ProbeTexel | null
+) => Generator<{
+  texelIndex: number;
+  partsReader: ProbeBatchReader;
+}>;
 
 // bilinear interpolation of normals in triangle, with normalization
 function setBlendedNormal(
@@ -219,11 +216,10 @@ export function useLightProbe(
   const batchTexels = new Array(PROBE_BATCH_COUNT) as (number | undefined)[];
 
   // @todo ensure there is biasing to be in middle of texel physical square
-  const renderLightProbeBatch: ProbeBatcher = function renderLightProbeBatch(
+  const renderLightProbeBatch: ProbeBatcher = function* renderLightProbeBatch(
     gl,
     lightScene,
-    batchItemGetter,
-    batchResultCallback
+    batchItemGetter
   ) {
     // save existing renderer state
     gl.getClearColor(tmpPrevClearColor);
@@ -481,7 +477,7 @@ export function useLightProbe(
         yield probeDataReport;
       };
 
-      batchResultCallback(renderedTexelIndex, probePartsReporter);
+      yield { texelIndex: renderedTexelIndex, partsReader: probePartsReporter };
     }
   };
 

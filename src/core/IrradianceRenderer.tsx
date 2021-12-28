@@ -347,7 +347,10 @@ const IrradianceRenderer: React.FC<{
             throw new Error('unexpected missing output');
           }
 
-          renderLightProbeBatch(
+          for (const {
+            texelIndex,
+            partsReader: readLightProbe
+          } of renderLightProbeBatch(
             gl,
             workbenchRef.current.lightScene,
             () => {
@@ -378,21 +381,20 @@ const IrradianceRenderer: React.FC<{
               }
 
               return null;
-            },
-            (texelIndex, readLightProbe) => {
-              readTexel(tmpRgba, readLightProbe, probePixelAreaLookup);
-
-              // store resulting total illumination
-              storeLightMapValue(
-                atlasMap.data,
-                atlasWidth,
-                totalTexelCount,
-                texelIndex,
-                passOutputData
-              );
-              passOutput.needsUpdate = true;
             }
-          );
+          )) {
+            readTexel(tmpRgba, readLightProbe, probePixelAreaLookup);
+
+            // store resulting total illumination
+            storeLightMapValue(
+              atlasMap.data,
+              atlasWidth,
+              totalTexelCount,
+              texelIndex,
+              passOutputData
+            );
+            passOutput.needsUpdate = true;
+          }
 
           // mark state as completed once all texels are done
           if (passTexelCounter[0] >= totalTexelCount) {
@@ -425,7 +427,7 @@ const IrradianceRenderer: React.FC<{
 
     let batchCount = 0;
 
-    debugProbeBatch(
+    for (const _item of debugProbeBatch(
       gl,
       workbenchRef.current.lightScene,
       () => {
@@ -437,11 +439,10 @@ const IrradianceRenderer: React.FC<{
         batchCount += 1;
 
         return texelInfo;
-      },
-      () => {
-        // no-op (not consuming the data)
       }
-    );
+    )) {
+      // no-op (not consuming the data)
+    }
   });
 
   // report debug texture
