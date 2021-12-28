@@ -1,8 +1,14 @@
-import React, { useEffect, useState, useMemo, useRef } from 'react';
+import React, {
+  useEffect,
+  useState,
+  useMemo,
+  useCallback,
+  useRef
+} from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 
-import { useWorkManager } from './WorkManager';
+import { useWorkManager, WorkCallback } from './WorkManager';
 import { AtlasMap } from './IrradianceAtlasMapper';
 import { Workbench } from './IrradianceSceneManager';
 import { performSceneSetup } from './lightScene';
@@ -219,6 +225,32 @@ function* getTexels(workbench: Workbench, onFinished: () => void) {
   onFinished();
 }
 
+function useWorkRequest(isActive: boolean) {
+  const latestRequestRef = useRef<WorkCallback | null>(null);
+  useWorkManager(
+    isActive
+      ? (gl) => {
+          // get latest work request and always reset it right away
+          const request = latestRequestRef.current;
+          latestRequestRef.current = null;
+
+          if (request) {
+            request(gl);
+          }
+        }
+      : null
+  );
+
+  // awaitable request for next microtask inside RAF
+  const requestWork = useCallback(() => {
+    return new Promise<THREE.WebGLRenderer>((resolve) => {
+      latestRequestRef.current = resolve;
+    });
+  }, []);
+
+  return requestWork;
+}
+
 // individual renderer worker lifecycle instance
 // (in parent, key to workbench.id to restart on changes)
 // @todo report completed flag
@@ -254,90 +286,15 @@ const IrradianceRenderer: React.FC<{
     };
   }, []);
 
-  const [processingState, setProcessingState] = useState(() => {
-    return {
-      passOutput: undefined as THREE.Texture | undefined, // current pass's output
-      passOutputData: undefined as Float32Array | undefined, // current pass's output data
-      // dummy texel iterator, initialized on next pass
-      passTexelIterator: {
-        next: () =>
-          ({
-            done: true,
-            value: null
-          } as IteratorResult<ProbeTexel | null>)
-      }, // texel iterator state
-      passComplete: true, // this triggers new pass on next render
-      passesRemaining: MAX_PASSES
-    };
-  });
-
-  // kick off new pass when current one is complete
-  useEffect(() => {
-    const { passComplete, passesRemaining } = processingState;
-
-    // check if there is anything to do
-    if (!passComplete) {
-      return;
-    }
-
-    const { irradiance, irradianceData } = workbenchRef.current;
-
-    // store and discard the active layer output texture
-    if (processingState.passOutput && processingState.passOutputData) {
-      irradianceData.set(processingState.passOutputData);
-      irradiance.needsUpdate = true;
-      processingState.passOutput.dispose();
-    }
-
-    // check if a new pass has to be set up
-    if (passesRemaining === 0) {
-      // if done, dereference large data objects to help free up memory
-      setProcessingState((prev) => {
-        if (!prev.passOutputData) {
-          return prev;
-        }
-        return { ...prev, passOutputData: undefined };
-      });
-
-      // notify parent
-      onCompleteRef.current();
-
-      return;
-    }
-
-    // set up a new output texture for new pass
-    // @todo this might not even need to be a texture? but could be useful for live debug display
-    const [passOutput, passOutputData] = createTemporaryLightMapTexture(
-      workbenchRef.current.atlasMap.width,
-      workbenchRef.current.atlasMap.height
-    );
-
-    setProcessingState((prev) => {
-      return {
-        passOutput,
-        passOutputData,
-        passTexelIterator: getTexels(workbenchRef.current, () => {
-          // mark state as completed once all texels are done
-          setProcessingState((prev) => {
-            return {
-              ...prev,
-              passComplete: true
-            };
-          });
-        }),
-        passComplete: false,
-        passesRemaining: prev.passesRemaining - 1
-      };
-    });
-  }, [processingState]);
-
-  const outputIsComplete =
-    processingState.passesRemaining === 0 && processingState.passComplete;
+  const [outputIsComplete, setOutputIsComplete] = useState(false);
+  const requestWork = useWorkRequest(!outputIsComplete);
 
   // light scene setup
   useEffect(() => {
-    // nothing to do if finished
+    // notify parent once scene cleanup is done
     if (outputIsComplete) {
+      onCompleteRef.current();
+
       return () => undefined;
     }
 
@@ -346,20 +303,29 @@ const IrradianceRenderer: React.FC<{
     return cleanup;
   }, [outputIsComplete]);
 
-  useWorkManager(
-    outputIsComplete
-      ? null
-      : (gl) => {
-          const { passTexelIterator, passOutput, passOutputData } =
-            processingState;
+  // kick off work
+  useEffect(() => {
+    async function runBakingPasses(workbench: Workbench) {
+      const { atlasMap, irradiance, irradianceData } = workbench;
+      const { width: atlasWidth, height: atlasHeight } = atlasMap;
+      const totalTexelCount = atlasWidth * atlasHeight;
 
-          const { atlasMap } = workbenchRef.current;
-          const { width: atlasWidth, height: atlasHeight } = atlasMap;
-          const totalTexelCount = atlasWidth * atlasHeight;
+      for (let passCount = 0; passCount < MAX_PASSES; passCount += 1) {
+        // set up a new output texture for new pass
+        // @todo this might not even need to be a texture? but could be useful for live debug display
+        const [passOutput, passOutputData] = createTemporaryLightMapTexture(
+          workbenchRef.current.atlasMap.width,
+          workbenchRef.current.atlasMap.height
+        );
 
-          if (!passOutputData || !passOutput) {
-            throw new Error('unexpected missing output');
-          }
+        // main work iteration
+        let texelsDone = false;
+        const texelIterator = getTexels(workbenchRef.current, () => {
+          texelsDone = true;
+        });
+
+        while (!texelsDone) {
+          const gl = await requestWork();
 
           for (const {
             texelIndex,
@@ -367,7 +333,7 @@ const IrradianceRenderer: React.FC<{
           } of probeRef.current!.renderLightProbeBatch(
             gl,
             workbenchRef.current.lightScene,
-            passTexelIterator
+            texelIterator
           )) {
             readTexel(tmpRgba, readLightProbe, probePixelAreaLookup);
 
@@ -385,7 +351,22 @@ const IrradianceRenderer: React.FC<{
             passOutput.needsUpdate = true;
           }
         }
-  );
+
+        // pass is complete, apply the computed texels into active lightmap
+        // (used in the next pass and final display)
+        irradianceData.set(passOutputData);
+        irradiance.needsUpdate = true;
+
+        // discard this pass's output texture
+        passOutput.dispose();
+      }
+    }
+
+    // @todo unmounted check
+    runBakingPasses(workbenchRef.current).then(() => {
+      setOutputIsComplete(true);
+    });
+  }, [requestWork]);
 
   // debug probe @todo rewrite
   /*
