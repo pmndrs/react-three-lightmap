@@ -7,7 +7,7 @@ import { AtlasMap } from './IrradianceAtlasMapper';
 import { Workbench } from './IrradianceSceneManager';
 import { performSceneSetup } from './lightScene';
 import {
-  ProbeBatchRenderer,
+  ProbeTexel,
   ProbeBatchReader,
   useLightProbe
 } from './IrradianceLightProbe';
@@ -41,11 +41,10 @@ function createTemporaryLightMapTexture(
   return [texture, data];
 }
 
-function queueTexel(
+function getTexelInfo(
   atlasMap: AtlasMap,
-  texelIndex: number,
-  renderLightProbe: ProbeBatchRenderer
-): boolean {
+  texelIndex: number
+): ProbeTexel | null {
   // get current atlas face we are filling up
   const texelInfoBase = texelIndex * 4;
   const texelPosU = atlasMap.data[texelInfoBase];
@@ -55,7 +54,7 @@ function queueTexel(
 
   // skip computation if this texel is empty
   if (texelItemEnc === 0) {
-    return false;
+    return null;
   }
 
   // otherwise, proceed with computation and exit
@@ -76,11 +75,16 @@ function queueTexel(
     );
   }
 
-  // render the probe viewports (will read the data later)
-  renderLightProbe(texelIndex, atlasItem, texelFaceIndex, texelPosU, texelPosV);
-
-  // signal that computation happened
-  return true;
+  // report the viable texel to be baked
+  // @todo reduce malloc?
+  return {
+    texelIndex,
+    originalMesh: atlasItem.originalMesh,
+    originalBuffer: atlasItem.originalBuffer,
+    faceIndex: texelFaceIndex,
+    pU: texelPosU,
+    pV: texelPosV
+  };
 }
 
 // collect and combine pixel aggregate from rendered probe viewports
@@ -360,17 +364,17 @@ const IrradianceRenderer: React.FC<{
                 // always update texel count
                 passTexelCounter[0] += 1;
 
-                if (
-                  !queueTexel(
-                    atlasMap,
-                    texelPickMap[currentCounter],
-                    renderBatchItem
-                  )
-                ) {
+                // see if we can render this next texel
+                const texelInfo = getTexelInfo(
+                  atlasMap,
+                  texelPickMap[currentCounter]
+                );
+                if (!texelInfo) {
                   continue;
                 }
 
-                // if something was queued, stop the loop
+                // if something was found, render it and stop looking
+                renderBatchItem(texelInfo);
                 break;
               }
             },
@@ -424,11 +428,15 @@ const IrradianceRenderer: React.FC<{
       gl,
       workbenchRef.current.lightScene,
       (renderBatchItem) => {
-        queueTexel(
+        const texelInfo = getTexelInfo(
           atlasMap,
-          atlasMap.width * 1 + 1 + batchCount,
-          renderBatchItem
+          atlasMap.width * 1 + 1 + batchCount
         );
+
+        if (texelInfo) {
+          renderBatchItem(texelInfo);
+        }
+
         batchCount += 1;
       },
       () => {

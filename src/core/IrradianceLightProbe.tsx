@@ -43,21 +43,25 @@ export type ProbeDataReport = {
   originY: number;
 };
 
-export type ProbeBatchRenderer = (
-  texelIndex: number,
-  atlasMapItem: AtlasMapItem,
-  faceIndex: number,
-  pU: number,
-  pV: number
-) => void;
+export interface ProbeTexel {
+  texelIndex: number; // used by caller for correlation
+  originalMesh: THREE.Mesh;
+  originalBuffer: THREE.BufferGeometry;
+  faceIndex: number;
+  pU: number;
+  pV: number;
+}
 
 export type ProbeBatchReader = () => Generator<ProbeDataReport>;
 
 export type ProbeBatcher = (
   gl: THREE.WebGLRenderer,
   lightScene: THREE.Scene,
-  batchItemCallback: (renderer: ProbeBatchRenderer) => void,
-  batchResultCallback: (batchIndex: number, reader: ProbeBatchReader) => void
+  batchItemCallback: (renderer: (texelInfo: ProbeTexel) => void) => void,
+  batchResultCallback: (
+    texelIndex: number,
+    partsReader: ProbeBatchReader
+  ) => void
 ) => void;
 
 // bilinear interpolation of normals in triangle, with normalization
@@ -245,14 +249,15 @@ export function useLightProbe(
     for (let batchItem = 0; batchItem < PROBE_BATCH_COUNT; batchItem += 1) {
       batchTexels[batchItem] = undefined;
 
-      batchItemCallback((texelIndex, atlasMapItem, faceIndex, pU, pV) => {
+      batchItemCallback((texelInfo) => {
+        const { texelIndex, originalMesh, originalBuffer, faceIndex, pU, pV } =
+          texelInfo;
+
         // each batch is 2 tiles high
         const batchOffsetY = batchItem * probeTargetSize * 2;
 
         // save which texel is being rendered for later reporting
         batchTexels[batchItem] = texelIndex;
-
-        const { originalMesh, originalBuffer } = atlasMapItem;
 
         if (!originalBuffer.index) {
           throw new Error('expected indexed mesh');
@@ -419,17 +424,18 @@ export function useLightProbe(
       }
 
       // each batch is 2 tiles high
-      const batchOffsetY = batchItem * probeTargetSize * 2;
-      const rowPixelStride = probeTargetSize * 4;
-      const probeDataReport: ProbeDataReport = {
-        rgbaData: probeData,
-        rowPixelStride,
-        probeBox: tmpProbeBox,
-        originX: 0, // filled in later
-        originY: 0
-      };
+      const probePartsReporter = function* () {
+        const batchOffsetY = batchItem * probeTargetSize * 2;
+        const rowPixelStride = probeTargetSize * 4;
 
-      batchResultCallback(renderedTexelIndex, function* () {
+        const probeDataReport: ProbeDataReport = {
+          rgbaData: probeData,
+          rowPixelStride,
+          probeBox: tmpProbeBox,
+          originX: 0, // filled in later
+          originY: 0
+        };
+
         tmpProbeBox.set(
           0,
           batchOffsetY + probeTargetSize,
@@ -474,7 +480,9 @@ export function useLightProbe(
         probeDataReport.originX = 0;
         probeDataReport.originX = halfSize;
         yield probeDataReport;
-      });
+      };
+
+      batchResultCallback(renderedTexelIndex, probePartsReporter);
     }
   };
 
