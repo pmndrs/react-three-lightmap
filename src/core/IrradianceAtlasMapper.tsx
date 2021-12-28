@@ -60,6 +60,7 @@ const FRAGMENT_SHADER = `
 export const ATLAS_OPT_OUT_FLAG = Symbol('lightmap atlas opt out flag');
 
 // based on traverse() in https://github.com/mrdoob/three.js/blob/dev/src/core/Object3D.js
+// @todo ignore items with visible = false?
 export function traverseAtlasItems(
   object: THREE.Object3D,
   callback: (object: THREE.Object3D) => void
