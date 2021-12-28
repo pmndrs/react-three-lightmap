@@ -55,7 +55,7 @@ export type ProbeBatchReader = () => Generator<ProbeDataReport>;
 export type ProbeBatcher = (
   gl: THREE.WebGLRenderer,
   lightScene: THREE.Scene,
-  batchItemGetter: () => ProbeTexel | null
+  texelIterator: Iterator<ProbeTexel | null>
 ) => Generator<{
   texelIndex: number;
   partsReader: ProbeBatchReader;
@@ -219,7 +219,7 @@ export function useLightProbe(
   const renderLightProbeBatch: ProbeBatcher = function* renderLightProbeBatch(
     gl,
     lightScene,
-    batchItemGetter
+    texelIterator
   ) {
     // save existing renderer state
     gl.getClearColor(tmpPrevClearColor);
@@ -243,11 +243,11 @@ export function useLightProbe(
     gl.clear(true, true, false);
 
     for (let batchItem = 0; batchItem < PROBE_BATCH_COUNT; batchItem += 1) {
-      const texelInfo = batchItemGetter();
+      const texelResult = texelIterator.next();
 
-      if (texelInfo) {
+      if (!texelResult.done && texelResult.value) {
         const { texelIndex, originalMesh, originalBuffer, faceIndex, pU, pV } =
-          texelInfo;
+          texelResult.value;
 
         // each batch is 2 tiles high
         const batchOffsetY = batchItem * probeTargetSize * 2;

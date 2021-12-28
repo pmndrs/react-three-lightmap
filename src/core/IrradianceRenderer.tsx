@@ -188,7 +188,7 @@ function storeLightMapValue(
 }
 
 // iterate through all texels
-function* getTexels(workbench: Workbench) {
+function* getTexels(workbench: Workbench, onFinished: () => void) {
   const { atlasMap } = workbench;
   const { width: atlasWidth, height: atlasHeight } = atlasMap;
   const totalTexelCount = atlasWidth * atlasHeight;
@@ -214,6 +214,8 @@ function* getTexels(workbench: Workbench) {
     retryCount = 0;
     yield texelInfo;
   }
+
+  onFinished();
 }
 
 // individual renderer worker lifecycle instance
@@ -237,7 +239,14 @@ const IrradianceRenderer: React.FC<{
     return {
       passOutput: undefined as THREE.Texture | undefined, // current pass's output
       passOutputData: undefined as Float32Array | undefined, // current pass's output data
-      passTexelIterator: getTexels(workbenchRef.current), // texel iterator state
+      // dummy texel iterator, initialized on next pass
+      passTexelIterator: {
+        next: () =>
+          ({
+            done: true,
+            value: null
+          } as IteratorResult<ProbeTexel | null>)
+      }, // texel iterator state
       passComplete: true, // this triggers new pass on next render
       passesRemaining: MAX_PASSES
     };
@@ -288,7 +297,15 @@ const IrradianceRenderer: React.FC<{
       return {
         passOutput,
         passOutputData,
-        passTexelIterator: getTexels(workbenchRef.current),
+        passTexelIterator: getTexels(workbenchRef.current, () => {
+          // mark state as completed once all texels are done
+          setProcessingState((prev) => {
+            return {
+              ...prev,
+              passComplete: true
+            };
+          });
+        }),
         passComplete: false,
         passesRemaining: prev.passesRemaining - 1
       };
@@ -331,24 +348,13 @@ const IrradianceRenderer: React.FC<{
             throw new Error('unexpected missing output');
           }
 
-          let texelsDone = false; // intercept whether there are more texels in this pass
-
           for (const {
             texelIndex,
             partsReader: readLightProbe
           } of renderLightProbeBatch(
             gl,
             workbenchRef.current.lightScene,
-            () => {
-              const result = passTexelIterator.next();
-
-              if (result.done) {
-                texelsDone = true;
-                return null;
-              }
-
-              return result.value;
-            }
+            passTexelIterator
           )) {
             readTexel(tmpRgba, readLightProbe, probePixelAreaLookup);
 
@@ -364,16 +370,6 @@ const IrradianceRenderer: React.FC<{
             // make sure this shows up on next bounce pass
             // @todo move?
             passOutput.needsUpdate = true;
-          }
-
-          // mark state as completed once all texels are done
-          if (texelsDone) {
-            setProcessingState((prev) => {
-              return {
-                ...prev,
-                passComplete: true
-              };
-            });
           }
         }
   );
@@ -395,21 +391,16 @@ const IrradianceRenderer: React.FC<{
 
     const { atlasMap } = workbenchRef.current;
 
-    let batchCount = 0;
+    const startX = 1;
+    const startY = 1;
+    function* debugIterator() {
+      yield getTexelInfo(atlasMap, atlasMap.width * startY + startX);
+    }
 
     for (const _item of debugProbeBatch(
       gl,
       workbenchRef.current.lightScene,
-      () => {
-        const texelInfo = getTexelInfo(
-          atlasMap,
-          atlasMap.width * 1 + 1 + batchCount
-        );
-
-        batchCount += 1;
-
-        return texelInfo;
-      }
+      debugIterator()
     )) {
       // no-op (not consuming the data)
     }
