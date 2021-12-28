@@ -92,6 +92,11 @@ export function useWorkManager(cb: WorkCallback | null) {
 }
 
 export function useWorkRequest(isActive: boolean) {
+  const unmountedRef = useRef(false);
+  useEffect(() => {
+    unmountedRef.current = true;
+  }, []);
+
   const latestRequestRef = useRef<WorkCallback | null>(null);
   useWorkManager(
     isActive
@@ -109,6 +114,17 @@ export function useWorkRequest(isActive: boolean) {
 
   // awaitable request for next microtask inside RAF
   const requestWork = useCallback(() => {
+    // this helps break out of long-running async jobs
+    if (unmountedRef.current) {
+      throw new Error('work manager is no longer available');
+    }
+
+    // consistency check
+    if (latestRequestRef.current) {
+      throw new Error('work already requested');
+    }
+
+    // schedule the microtask
     return new Promise<THREE.WebGLRenderer>((resolve) => {
       latestRequestRef.current = resolve;
     });
