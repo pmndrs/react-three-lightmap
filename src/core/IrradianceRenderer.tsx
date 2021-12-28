@@ -8,7 +8,7 @@ import { Workbench } from './IrradianceSceneManager';
 import { withLightScene } from './lightScene';
 import {
   ProbeBatchReader,
-  createLightProbe,
+  withLightProbe,
   generatePixelAreaLookup
 } from './lightProbe';
 
@@ -158,24 +158,6 @@ const IrradianceRenderer: React.FC<{
   const onDebugLightProbeRef = useRef(props.onDebugLightProbe);
   onDebugLightProbeRef.current = props.onDebugLightProbe;
 
-  const probePixelAreaLookup = useMemo(
-    () => generatePixelAreaLookup(workbenchRef.current.settings.targetSize),
-    []
-  );
-
-  const probeRef = useRef<ReturnType<typeof createLightProbe> | null>(null);
-  useEffect(() => {
-    const { dispose } = (probeRef.current = createLightProbe(
-      workbenchRef.current.aoMode,
-      workbenchRef.current.aoDistance,
-      workbenchRef.current.settings
-    ));
-
-    return () => {
-      dispose();
-    };
-  }, []);
-
   const [outputIsComplete, setOutputIsComplete] = useState(false);
   const requestWork = useWorkRequest(!outputIsComplete);
 
@@ -184,87 +166,84 @@ const IrradianceRenderer: React.FC<{
     // notify parent once scene cleanup is done
     if (outputIsComplete) {
       onCompleteRef.current();
-
-      return () => undefined;
+      return;
     }
 
     async function runBakingPasses(workbench: Workbench) {
-      const { atlasMap, irradiance, irradianceData } = workbench;
-      const { width: atlasWidth, height: atlasHeight } = atlasMap;
-      const totalTexelCount = atlasWidth * atlasHeight;
+      await withLightProbe(
+        workbench.aoMode,
+        workbench.aoDistance,
+        workbench.settings,
+        async (renderLightProbeBatch) => {
+          const { atlasMap, irradiance, irradianceData } = workbench;
+          const { width: atlasWidth, height: atlasHeight } = atlasMap;
+          const totalTexelCount = atlasWidth * atlasHeight;
 
-      for (let passCount = 0; passCount < MAX_PASSES; passCount += 1) {
-        // set up a new output texture for new pass
-        // @todo this might not even need to be a texture? but could be useful for live debug display
-        const [passOutput, passOutputData] = createTemporaryLightMapTexture(
-          atlasMap.width,
-          atlasMap.height
-        );
+          // @todo make this async?
+          const probePixelAreaLookup = generatePixelAreaLookup(
+            workbenchRef.current.settings.targetSize
+          );
 
-        // main work iteration
-        let texelsDone = false;
-        const texelIterator = scanAtlasTexels(atlasMap, () => {
-          texelsDone = true;
-        });
-
-        while (!texelsDone) {
-          const gl = await requestWork();
-
-          for (const {
-            texelIndex,
-            partsReader: readLightProbe
-          } of probeRef.current!.renderLightProbeBatch(
-            gl,
-            workbench.lightScene,
-            texelIterator
-          )) {
-            readTexel(tmpRgba, readLightProbe, probePixelAreaLookup);
-
-            // store resulting total illumination
-            storeLightMapValue(
-              atlasMap.data,
-              atlasWidth,
-              totalTexelCount,
-              texelIndex,
-              passOutputData
+          for (let passCount = 0; passCount < MAX_PASSES; passCount += 1) {
+            // set up a new output texture for new pass
+            // @todo this might not even need to be a texture? but could be useful for live debug display
+            const [passOutput, passOutputData] = createTemporaryLightMapTexture(
+              atlasMap.width,
+              atlasMap.height
             );
 
-            // make sure this shows up on next bounce pass
-            // @todo move?
-            passOutput.needsUpdate = true;
+            // main work iteration
+            let texelsDone = false;
+            const texelIterator = scanAtlasTexels(atlasMap, () => {
+              texelsDone = true;
+            });
+
+            while (!texelsDone) {
+              const gl = await requestWork();
+
+              for (const {
+                texelIndex,
+                partsReader: readLightProbe
+              } of renderLightProbeBatch(
+                gl,
+                workbench.lightScene,
+                texelIterator
+              )) {
+                readTexel(tmpRgba, readLightProbe, probePixelAreaLookup);
+
+                // store resulting total illumination
+                storeLightMapValue(
+                  atlasMap.data,
+                  atlasWidth,
+                  totalTexelCount,
+                  texelIndex,
+                  passOutputData
+                );
+
+                // make sure this shows up on next bounce pass
+                // @todo move?
+                passOutput.needsUpdate = true;
+              }
+            }
+
+            // pass is complete, apply the computed texels into active lightmap
+            // (used in the next pass and final display)
+            irradianceData.set(passOutputData);
+            irradiance.needsUpdate = true;
+
+            // discard this pass's output texture
+            passOutput.dispose();
           }
         }
-
-        // pass is complete, apply the computed texels into active lightmap
-        // (used in the next pass and final display)
-        irradianceData.set(passOutputData);
-        irradiance.needsUpdate = true;
-
-        // discard this pass's output texture
-        passOutput.dispose();
-      }
+      );
     }
 
     const workbench = workbenchRef.current;
 
-    // track unmount inside a promise
-    let unmountedCb = () => {};
-    const whenUnmounted = new Promise<void>((resolve) => {
-      unmountedCb = resolve;
+    // not tracking unmount here because the work manager will bail out anyway when unmounted early
+    withLightScene(workbench, () => runBakingPasses(workbench)).then(() => {
+      setOutputIsComplete(true);
     });
-
-    withLightScene(workbench, () =>
-      // kick off work but break out before baking is complete if unmounted early
-      // @todo stop the baker as well - though requestWork will already stop returning
-      Promise.race([
-        whenUnmounted,
-        runBakingPasses(workbench).then(() => {
-          setOutputIsComplete(true);
-        })
-      ])
-    );
-
-    return () => unmountedCb();
   }, [outputIsComplete, requestWork]);
 
   // debug probe @todo rewrite

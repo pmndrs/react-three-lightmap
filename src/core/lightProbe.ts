@@ -166,15 +166,15 @@ export function generatePixelAreaLookup(probeTargetSize: number) {
 }
 
 // @todo use light sphere for AO (double-check that far-extent is radius + epsilon)
-export function createLightProbe(
+export async function withLightProbe(
   aoMode: boolean,
   aoDistance: number,
-  settings: LightProbeSettings
-): {
-  renderLightProbeBatch: ProbeBatcher;
-  debugLightProbeTexture: THREE.Texture;
-  dispose: () => void;
-} {
+  settings: LightProbeSettings,
+  taskCallback: (
+    renderLightProbeBatch: ProbeBatcher,
+    debugLightProbeTexture: THREE.Texture
+  ) => Promise<void>
+) {
   const probeTargetSize = settings.targetSize;
   const probeBgColor = aoMode ? PROBE_BG_FULL : PROBE_BG_ZERO;
 
@@ -467,12 +467,10 @@ export function createLightProbe(
     }
   };
 
-  return {
-    renderLightProbeBatch,
-    debugLightProbeTexture: probeTarget.texture,
-
-    dispose() {
-      probeTarget.dispose();
-    }
-  };
+  try {
+    await taskCallback(renderLightProbeBatch, probeTarget.texture);
+  } finally {
+    // always clean up regardless of error state
+    probeTarget.dispose();
+  }
 }
