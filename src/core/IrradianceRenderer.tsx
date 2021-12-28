@@ -9,8 +9,9 @@ import { performSceneSetup } from './lightScene';
 import {
   ProbeTexel,
   ProbeBatchReader,
-  useLightProbe
-} from './IrradianceLightProbe';
+  createLightProbe,
+  generatePixelAreaLookup
+} from './lightProbe';
 
 const MAX_PASSES = 2;
 
@@ -235,6 +236,24 @@ const IrradianceRenderer: React.FC<{
   const onDebugLightProbeRef = useRef(props.onDebugLightProbe);
   onDebugLightProbeRef.current = props.onDebugLightProbe;
 
+  const probePixelAreaLookup = useMemo(
+    () => generatePixelAreaLookup(workbenchRef.current.settings.targetSize),
+    []
+  );
+
+  const probeRef = useRef<ReturnType<typeof createLightProbe> | null>(null);
+  useEffect(() => {
+    const { dispose } = (probeRef.current = createLightProbe(
+      workbenchRef.current.aoMode,
+      workbenchRef.current.aoDistance,
+      workbenchRef.current.settings
+    ));
+
+    return () => {
+      dispose();
+    };
+  }, []);
+
   const [processingState, setProcessingState] = useState(() => {
     return {
       passOutput: undefined as THREE.Texture | undefined, // current pass's output
@@ -312,12 +331,6 @@ const IrradianceRenderer: React.FC<{
     });
   }, [processingState]);
 
-  const { renderLightProbeBatch, probePixelAreaLookup } = useLightProbe(
-    workbenchRef.current.aoMode,
-    workbenchRef.current.aoDistance,
-    workbenchRef.current.settings
-  );
-
   const outputIsComplete =
     processingState.passesRemaining === 0 && processingState.passComplete;
 
@@ -351,7 +364,7 @@ const IrradianceRenderer: React.FC<{
           for (const {
             texelIndex,
             partsReader: readLightProbe
-          } of renderLightProbeBatch(
+          } of probeRef.current!.renderLightProbeBatch(
             gl,
             workbenchRef.current.lightScene,
             passTexelIterator
@@ -374,7 +387,8 @@ const IrradianceRenderer: React.FC<{
         }
   );
 
-  // debug probe
+  // debug probe @todo rewrite
+  /*
   const { renderLightProbeBatch: debugProbeBatch, debugLightProbeTexture } =
     useLightProbe(
       workbenchRef.current.aoMode,
@@ -412,6 +426,7 @@ const IrradianceRenderer: React.FC<{
       onDebugLightProbeRef.current(debugLightProbeTexture);
     }
   }, [debugLightProbeTexture]);
+  */
 
   return null;
 };
