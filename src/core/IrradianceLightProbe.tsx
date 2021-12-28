@@ -57,7 +57,7 @@ export type ProbeBatchReader = () => Generator<ProbeDataReport>;
 export type ProbeBatcher = (
   gl: THREE.WebGLRenderer,
   lightScene: THREE.Scene,
-  batchItemCallback: (renderer: (texelInfo: ProbeTexel) => void) => void,
+  batchItemGetter: () => ProbeTexel,
   batchResultCallback: (
     texelIndex: number,
     partsReader: ProbeBatchReader
@@ -222,7 +222,7 @@ export function useLightProbe(
   const renderLightProbeBatch: ProbeBatcher = function renderLightProbeBatch(
     gl,
     lightScene,
-    batchItemCallback,
+    batchItemGetter,
     batchResultCallback
   ) {
     // save existing renderer state
@@ -247,9 +247,9 @@ export function useLightProbe(
     gl.clear(true, true, false);
 
     for (let batchItem = 0; batchItem < PROBE_BATCH_COUNT; batchItem += 1) {
-      batchTexels[batchItem] = undefined;
+      const texelInfo = batchItemGetter();
 
-      batchItemCallback((texelInfo) => {
+      if (texelInfo) {
         const { texelIndex, originalMesh, originalBuffer, faceIndex, pU, pV } =
           texelInfo;
 
@@ -390,10 +390,9 @@ export function useLightProbe(
         );
         gl.setRenderTarget(probeTarget); // propagate latest target params
         gl.render(lightScene, probeCam);
-      });
-
-      // if nothing was rendered there is no need to finish the batch
-      if (batchTexels[batchItem] === undefined) {
+      } else {
+        // if nothing else to render, mark the end of batch and finish
+        batchTexels[batchItem] = undefined;
         break;
       }
     }

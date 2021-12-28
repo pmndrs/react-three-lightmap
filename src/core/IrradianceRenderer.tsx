@@ -350,7 +350,7 @@ const IrradianceRenderer: React.FC<{
           renderLightProbeBatch(
             gl,
             workbenchRef.current.lightScene,
-            (renderBatchItem) => {
+            () => {
               // allow for skipping a certain amount of empty texels
               const maxCounter = Math.min(
                 totalTexelCount,
@@ -374,9 +374,10 @@ const IrradianceRenderer: React.FC<{
                 }
 
                 // if something was found, render it and stop looking
-                renderBatchItem(texelInfo);
-                break;
+                return texelInfo;
               }
+
+              return null;
             },
             (texelIndex, readLightProbe) => {
               readTexel(tmpRgba, readLightProbe, probePixelAreaLookup);
@@ -427,17 +428,15 @@ const IrradianceRenderer: React.FC<{
     debugProbeBatch(
       gl,
       workbenchRef.current.lightScene,
-      (renderBatchItem) => {
+      () => {
         const texelInfo = getTexelInfo(
           atlasMap,
           atlasMap.width * 1 + 1 + batchCount
         );
 
-        if (texelInfo) {
-          renderBatchItem(texelInfo);
-        }
-
         batchCount += 1;
+
+        return texelInfo;
       },
       () => {
         // no-op (not consuming the data)
