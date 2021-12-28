@@ -1,19 +1,12 @@
-import React, {
-  useEffect,
-  useState,
-  useMemo,
-  useCallback,
-  useRef
-} from 'react';
+import React, { useEffect, useState, useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 
-import { useWorkManager, WorkCallback } from './WorkManager';
-import { AtlasMap } from './IrradianceAtlasMapper';
+import { useWorkRequest } from './WorkManager';
+import { scanAtlasTexels } from './IrradianceAtlasMapper';
 import { Workbench } from './IrradianceSceneManager';
 import { withLightScene } from './lightScene';
 import {
-  ProbeTexel,
   ProbeBatchReader,
   createLightProbe,
   generatePixelAreaLookup
@@ -46,52 +39,6 @@ function createTemporaryLightMapTexture(
   texture.generateMipmaps = false;
 
   return [texture, data];
-}
-
-function getTexelInfo(
-  atlasMap: AtlasMap,
-  texelIndex: number
-): ProbeTexel | null {
-  // get current atlas face we are filling up
-  const texelInfoBase = texelIndex * 4;
-  const texelPosU = atlasMap.data[texelInfoBase];
-  const texelPosV = atlasMap.data[texelInfoBase + 1];
-  const texelItemEnc = atlasMap.data[texelInfoBase + 2];
-  const texelFaceEnc = atlasMap.data[texelInfoBase + 3];
-
-  // skip computation if this texel is empty
-  if (texelItemEnc === 0) {
-    return null;
-  }
-
-  // otherwise, proceed with computation and exit
-  const texelItemIndex = Math.round(texelItemEnc - 1);
-  const texelFaceIndex = Math.round(texelFaceEnc - 1);
-
-  if (texelItemIndex < 0 || texelItemIndex >= atlasMap.items.length) {
-    throw new Error(
-      `incorrect atlas map item data: ${texelPosU}, ${texelPosV}, ${texelItemEnc}, ${texelFaceEnc}`
-    );
-  }
-
-  const atlasItem = atlasMap.items[texelItemIndex];
-
-  if (texelFaceIndex < 0 || texelFaceIndex >= atlasItem.faceCount) {
-    throw new Error(
-      `incorrect atlas map face data: ${texelPosU}, ${texelPosV}, ${texelItemEnc}, ${texelFaceEnc}`
-    );
-  }
-
-  // report the viable texel to be baked
-  // @todo reduce malloc?
-  return {
-    texelIndex,
-    originalMesh: atlasItem.originalMesh,
-    originalBuffer: atlasItem.originalBuffer,
-    faceIndex: texelFaceIndex,
-    pU: texelPosU,
-    pV: texelPosV
-  };
 }
 
 // collect and combine pixel aggregate from rendered probe viewports
@@ -194,63 +141,6 @@ function storeLightMapValue(
   }
 }
 
-// iterate through all texels
-function* getTexels(workbench: Workbench, onFinished: () => void) {
-  const { atlasMap } = workbench;
-  const { width: atlasWidth, height: atlasHeight } = atlasMap;
-  const totalTexelCount = atlasWidth * atlasHeight;
-
-  let texelCount = 0;
-
-  let retryCount = 0;
-  while (texelCount < totalTexelCount) {
-    // get current texel info and increment
-    const currentCounter = texelCount;
-    texelCount += 1;
-
-    const texelInfo = getTexelInfo(atlasMap, currentCounter);
-
-    // try to keep looking for a reasonable number of cycles
-    // before yielding empty result
-    if (!texelInfo && retryCount < 100) {
-      retryCount += 1;
-      continue;
-    }
-
-    // yield out with either a found texel or nothing
-    retryCount = 0;
-    yield texelInfo;
-  }
-
-  onFinished();
-}
-
-function useWorkRequest(isActive: boolean) {
-  const latestRequestRef = useRef<WorkCallback | null>(null);
-  useWorkManager(
-    isActive
-      ? (gl) => {
-          // get latest work request and always reset it right away
-          const request = latestRequestRef.current;
-          latestRequestRef.current = null;
-
-          if (request) {
-            request(gl);
-          }
-        }
-      : null
-  );
-
-  // awaitable request for next microtask inside RAF
-  const requestWork = useCallback(() => {
-    return new Promise<THREE.WebGLRenderer>((resolve) => {
-      latestRequestRef.current = resolve;
-    });
-  }, []);
-
-  return requestWork;
-}
-
 // individual renderer worker lifecycle instance
 // (in parent, key to workbench.id to restart on changes)
 // @todo report completed flag
@@ -313,7 +203,7 @@ const IrradianceRenderer: React.FC<{
 
         // main work iteration
         let texelsDone = false;
-        const texelIterator = getTexels(workbench, () => {
+        const texelIterator = scanAtlasTexels(atlasMap, () => {
           texelsDone = true;
         });
 

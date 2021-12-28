@@ -8,6 +8,8 @@ import React, {
 import { useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 
+import { ProbeTexel } from './lightProbe';
+
 export interface AtlasMapItem {
   faceCount: number;
   originalMesh: THREE.Mesh;
@@ -77,6 +79,82 @@ export function traverseAtlasItems(
   for (const childObject of object.children) {
     traverseAtlasItems(childObject, callback);
   }
+}
+
+function getTexelInfo(
+  atlasMap: AtlasMap,
+  texelIndex: number
+): ProbeTexel | null {
+  // get current atlas face we are filling up
+  const texelInfoBase = texelIndex * 4;
+  const texelPosU = atlasMap.data[texelInfoBase];
+  const texelPosV = atlasMap.data[texelInfoBase + 1];
+  const texelItemEnc = atlasMap.data[texelInfoBase + 2];
+  const texelFaceEnc = atlasMap.data[texelInfoBase + 3];
+
+  // skip computation if this texel is empty
+  if (texelItemEnc === 0) {
+    return null;
+  }
+
+  // otherwise, proceed with computation and exit
+  const texelItemIndex = Math.round(texelItemEnc - 1);
+  const texelFaceIndex = Math.round(texelFaceEnc - 1);
+
+  if (texelItemIndex < 0 || texelItemIndex >= atlasMap.items.length) {
+    throw new Error(
+      `incorrect atlas map item data: ${texelPosU}, ${texelPosV}, ${texelItemEnc}, ${texelFaceEnc}`
+    );
+  }
+
+  const atlasItem = atlasMap.items[texelItemIndex];
+
+  if (texelFaceIndex < 0 || texelFaceIndex >= atlasItem.faceCount) {
+    throw new Error(
+      `incorrect atlas map face data: ${texelPosU}, ${texelPosV}, ${texelItemEnc}, ${texelFaceEnc}`
+    );
+  }
+
+  // report the viable texel to be baked
+  // @todo reduce malloc?
+  return {
+    texelIndex,
+    originalMesh: atlasItem.originalMesh,
+    originalBuffer: atlasItem.originalBuffer,
+    faceIndex: texelFaceIndex,
+    pU: texelPosU,
+    pV: texelPosV
+  };
+}
+
+// iterate through all texels
+export function* scanAtlasTexels(atlasMap: AtlasMap, onFinished: () => void) {
+  const { width: atlasWidth, height: atlasHeight } = atlasMap;
+  const totalTexelCount = atlasWidth * atlasHeight;
+
+  let texelCount = 0;
+
+  let retryCount = 0;
+  while (texelCount < totalTexelCount) {
+    // get current texel info and increment
+    const currentCounter = texelCount;
+    texelCount += 1;
+
+    const texelInfo = getTexelInfo(atlasMap, currentCounter);
+
+    // try to keep looking for a reasonable number of cycles
+    // before yielding empty result
+    if (!texelInfo && retryCount < 100) {
+      retryCount += 1;
+      continue;
+    }
+
+    // yield out with either a found texel or nothing
+    retryCount = 0;
+    yield texelInfo;
+  }
+
+  onFinished();
 }
 
 // write out original face geometry info into the atlas map

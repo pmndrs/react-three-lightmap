@@ -80,6 +80,7 @@ function createRAF(cb: () => void) {
   return signal;
 }
 
+// @todo eventually obsolete
 export function useWorkManager(cb: WorkCallback | null) {
   // get the work manager hook
   const hook = useContext(WorkManagerContext);
@@ -88,6 +89,32 @@ export function useWorkManager(cb: WorkCallback | null) {
   }
 
   hook(cb);
+}
+
+export function useWorkRequest(isActive: boolean) {
+  const latestRequestRef = useRef<WorkCallback | null>(null);
+  useWorkManager(
+    isActive
+      ? (gl) => {
+          // get latest work request and always reset it right away
+          const request = latestRequestRef.current;
+          latestRequestRef.current = null;
+
+          if (request) {
+            request(gl);
+          }
+        }
+      : null
+  );
+
+  // awaitable request for next microtask inside RAF
+  const requestWork = useCallback(() => {
+    return new Promise<THREE.WebGLRenderer>((resolve) => {
+      latestRequestRef.current = resolve;
+    });
+  }, []);
+
+  return requestWork;
 }
 
 // this simply acts as a central spot to schedule per-frame work
