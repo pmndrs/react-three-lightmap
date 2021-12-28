@@ -1,8 +1,8 @@
-import React, { useEffect, useState, useMemo, useContext, useRef } from 'react';
+import React, { useEffect, useState, useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 
-import { WorkManagerContext } from './WorkManager';
+import { useWorkManager } from './WorkManager';
 import { AtlasMap } from './IrradianceAtlasMapper';
 import { Workbench } from './IrradianceSceneManager';
 import { performSceneSetup } from './lightScene';
@@ -185,12 +185,6 @@ const IrradianceRenderer: React.FC<{
   onComplete: () => void;
   onDebugLightProbe?: (debugLightProbeTexture: THREE.Texture) => void;
 }> = (props) => {
-  // get the work manager hook
-  const useWorkManager = useContext(WorkManagerContext);
-  if (useWorkManager === null) {
-    throw new Error('expected work manager');
-  }
-
   // read once
   const workbenchRef = useRef(props.workbench);
 

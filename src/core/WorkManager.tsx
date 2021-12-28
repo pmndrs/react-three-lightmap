@@ -1,9 +1,15 @@
-import React, { useEffect, useMemo, useCallback, useRef } from 'react';
+import React, {
+  useEffect,
+  useMemo,
+  useCallback,
+  useRef,
+  useContext
+} from 'react';
 import { useThree } from '@react-three/fiber';
 
 const WORK_PER_FRAME = 2;
 
-type WorkCallback = (gl: THREE.WebGLRenderer) => void;
+export type WorkCallback = (gl: THREE.WebGLRenderer) => void;
 type WorkManagerHook = (callback: WorkCallback | null) => void;
 export const WorkManagerContext = React.createContext<WorkManagerHook | null>(
   null
@@ -72,6 +78,16 @@ function createRAF(cb: () => void) {
   requestAnimationFrame(frame);
 
   return signal;
+}
+
+export function useWorkManager(cb: WorkCallback | null) {
+  // get the work manager hook
+  const hook = useContext(WorkManagerContext);
+  if (hook === null) {
+    throw new Error('expected work manager');
+  }
+
+  hook(cb);
 }
 
 // this simply acts as a central spot to schedule per-frame work
