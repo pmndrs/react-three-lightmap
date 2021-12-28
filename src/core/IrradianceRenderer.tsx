@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo, useRef } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 
@@ -141,6 +141,74 @@ function storeLightMapValue(
   }
 }
 
+async function runBakingPasses(
+  workbench: Workbench,
+  requestWork: () => Promise<THREE.WebGLRenderer>
+) {
+  await withLightProbe(
+    workbench.aoMode,
+    workbench.aoDistance,
+    workbench.settings,
+    async (renderLightProbeBatch) => {
+      const { atlasMap, irradiance, irradianceData } = workbench;
+      const { width: atlasWidth, height: atlasHeight } = atlasMap;
+      const totalTexelCount = atlasWidth * atlasHeight;
+
+      // @todo make this async?
+      const probePixelAreaLookup = generatePixelAreaLookup(
+        workbench.settings.targetSize
+      );
+
+      for (let passCount = 0; passCount < MAX_PASSES; passCount += 1) {
+        // set up a new output texture for new pass
+        // @todo this might not even need to be a texture? but could be useful for live debug display
+        const [passOutput, passOutputData] = createTemporaryLightMapTexture(
+          atlasMap.width,
+          atlasMap.height
+        );
+
+        // main work iteration
+        let texelsDone = false;
+        const texelIterator = scanAtlasTexels(atlasMap, () => {
+          texelsDone = true;
+        });
+
+        while (!texelsDone) {
+          const gl = await requestWork();
+
+          for (const {
+            texelIndex,
+            partsReader: readLightProbe
+          } of renderLightProbeBatch(gl, workbench.lightScene, texelIterator)) {
+            readTexel(tmpRgba, readLightProbe, probePixelAreaLookup);
+
+            // store resulting total illumination
+            storeLightMapValue(
+              atlasMap.data,
+              atlasWidth,
+              totalTexelCount,
+              texelIndex,
+              passOutputData
+            );
+
+            // make sure this shows up on next bounce pass
+            // @todo move?
+            passOutput.needsUpdate = true;
+          }
+        }
+
+        // pass is complete, apply the computed texels into active lightmap
+        // (used in the next pass and final display)
+        irradianceData.set(passOutputData);
+        irradiance.needsUpdate = true;
+
+        // discard this pass's output texture
+        passOutput.dispose();
+      }
+    }
+  );
+}
+
 // individual renderer worker lifecycle instance
 // (in parent, key to workbench.id to restart on changes)
 // @todo report completed flag
@@ -169,79 +237,12 @@ const IrradianceRenderer: React.FC<{
       return;
     }
 
-    async function runBakingPasses(workbench: Workbench) {
-      await withLightProbe(
-        workbench.aoMode,
-        workbench.aoDistance,
-        workbench.settings,
-        async (renderLightProbeBatch) => {
-          const { atlasMap, irradiance, irradianceData } = workbench;
-          const { width: atlasWidth, height: atlasHeight } = atlasMap;
-          const totalTexelCount = atlasWidth * atlasHeight;
-
-          // @todo make this async?
-          const probePixelAreaLookup = generatePixelAreaLookup(
-            workbenchRef.current.settings.targetSize
-          );
-
-          for (let passCount = 0; passCount < MAX_PASSES; passCount += 1) {
-            // set up a new output texture for new pass
-            // @todo this might not even need to be a texture? but could be useful for live debug display
-            const [passOutput, passOutputData] = createTemporaryLightMapTexture(
-              atlasMap.width,
-              atlasMap.height
-            );
-
-            // main work iteration
-            let texelsDone = false;
-            const texelIterator = scanAtlasTexels(atlasMap, () => {
-              texelsDone = true;
-            });
-
-            while (!texelsDone) {
-              const gl = await requestWork();
-
-              for (const {
-                texelIndex,
-                partsReader: readLightProbe
-              } of renderLightProbeBatch(
-                gl,
-                workbench.lightScene,
-                texelIterator
-              )) {
-                readTexel(tmpRgba, readLightProbe, probePixelAreaLookup);
-
-                // store resulting total illumination
-                storeLightMapValue(
-                  atlasMap.data,
-                  atlasWidth,
-                  totalTexelCount,
-                  texelIndex,
-                  passOutputData
-                );
-
-                // make sure this shows up on next bounce pass
-                // @todo move?
-                passOutput.needsUpdate = true;
-              }
-            }
-
-            // pass is complete, apply the computed texels into active lightmap
-            // (used in the next pass and final display)
-            irradianceData.set(passOutputData);
-            irradiance.needsUpdate = true;
-
-            // discard this pass's output texture
-            passOutput.dispose();
-          }
-        }
-      );
-    }
-
     const workbench = workbenchRef.current;
 
     // not tracking unmount here because the work manager will bail out anyway when unmounted early
-    withLightScene(workbench, () => runBakingPasses(workbench)).then(() => {
+    withLightScene(workbench, () =>
+      runBakingPasses(workbench, requestWork)
+    ).then(() => {
       setOutputIsComplete(true);
     });
   }, [outputIsComplete, requestWork]);
