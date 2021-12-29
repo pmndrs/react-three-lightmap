@@ -13,7 +13,7 @@ import IrradianceSceneManager from './IrradianceSceneManager';
 import WorkManager from './WorkManager';
 import IrradianceRenderer from './IrradianceRenderer';
 import IrradianceScene from './IrradianceScene';
-import { LightProbeSettings, DEFAULT_LIGHT_PROBE_SETTINGS } from './lightProbe';
+import { LightProbeSettings } from './lightProbe';
 
 // prevent automatic generation of UV2 coordinates for content
 // (but still allow contribution to lightmap, for e.g. emissive objects, large occluders, etc)
@@ -72,7 +72,7 @@ const Lightmap = React.forwardRef<
 >(
   (
     {
-      ao: aoMode,
+      ao,
       aoDistance,
       emissiveMultiplier,
       lightMapSize,
@@ -83,32 +83,18 @@ const Lightmap = React.forwardRef<
     },
     sceneRef
   ) => {
-    // parse the convenience setting
-    const [[initialWidth, initialHeight]] = useState(() =>
-      lightMapSize
-        ? [
-            typeof lightMapSize === 'number' ? lightMapSize : lightMapSize[0],
-            typeof lightMapSize === 'number' ? lightMapSize : lightMapSize[1]
-          ]
-        : [undefined, undefined]
-    );
-
     const [isComplete, setIsComplete] = useState(false);
 
     return (
       <WorkManager>
         <IrradianceSceneManager
-          aoMode={!!aoMode}
+          ao={ao}
           aoDistance={aoDistance}
           emissiveMultiplier={emissiveMultiplier}
-          initialWidth={initialWidth}
-          initialHeight={initialHeight}
+          lightMapSize={lightMapSize}
           textureFilter={textureFilter}
           texelsPerUnit={texelsPerUnit}
-          settings={{
-            ...DEFAULT_LIGHT_PROBE_SETTINGS,
-            ...samplerSettings
-          }}
+          samplerSettings={samplerSettings}
         >
           {(workbench, startWorkbench) => (
             <>

@@ -3,7 +3,7 @@ import * as THREE from 'three';
 
 import { useWorkRequest } from './WorkManager';
 import { renderAtlas, AtlasMap } from './atlas';
-import { LightProbeSettings } from './lightProbe';
+import { LightProbeSettings, DEFAULT_LIGHT_PROBE_SETTINGS } from './lightProbe';
 import { computeAutoUV2Layout } from './AutoUV2';
 
 export interface Workbench {
@@ -67,38 +67,20 @@ function requestNextTick() {
 }
 
 const IrradianceSceneManager: React.FC<{
-  aoMode: boolean;
+  ao?: boolean;
   aoDistance?: number;
   emissiveMultiplier?: number;
-  initialWidth?: number;
-  initialHeight?: number;
+  lightMapSize?: number | [number, number];
   textureFilter?: THREE.TextureFilter;
   texelsPerUnit?: number;
-  settings: LightProbeSettings;
+  samplerSettings?: Partial<LightProbeSettings>;
   children: (
     workbench: Workbench | null,
     startWorkbench: (scene: THREE.Scene) => void
   ) => React.ReactNode;
-}> = ({
-  aoMode,
-  aoDistance,
-  emissiveMultiplier,
-  initialWidth,
-  initialHeight,
-  textureFilter,
-  texelsPerUnit,
-  settings,
-  children
-}) => {
+}> = (props) => {
   // read once
-  const aoModeRef = useRef(aoMode);
-  const aoDistanceRef = useRef(aoDistance);
-  const emissiveMultiplierRef = useRef(emissiveMultiplier);
-  const initialWidthRef = useRef(initialWidth);
-  const initialHeightRef = useRef(initialHeight);
-  const textureFilterRef = useRef(textureFilter);
-  const texelsPerUnitRef = useRef(texelsPerUnit); // read only once
-  const settingsRef = useRef(settings); // read only once
+  const propsRef = useRef(props);
 
   const requestWork = useWorkRequest();
 
@@ -108,17 +90,40 @@ const IrradianceSceneManager: React.FC<{
   const startHandler = useCallback(
     (scene: THREE.Scene) => {
       async function initialize() {
+        const {
+          ao,
+          aoDistance,
+          emissiveMultiplier,
+          lightMapSize,
+          textureFilter,
+          texelsPerUnit,
+          samplerSettings
+        } = propsRef.current;
+
+        const settings = {
+          ...DEFAULT_LIGHT_PROBE_SETTINGS,
+          ...samplerSettings
+        };
+
+        // parse the convenience setting
+        const [initialWidth, initialHeight] = lightMapSize
+          ? [
+              typeof lightMapSize === 'number' ? lightMapSize : lightMapSize[0],
+              typeof lightMapSize === 'number' ? lightMapSize : lightMapSize[1]
+            ]
+          : [undefined, undefined];
+
         // wait a bit for responsiveness
         await requestNextTick();
 
         // perform UV auto-layout in next tick
 
         const [computedWidth, computedHeight] = computeAutoUV2Layout(
-          initialWidthRef.current,
-          initialHeightRef.current,
+          initialWidth,
+          initialHeight,
           scene,
           {
-            texelsPerUnit: texelsPerUnitRef.current || DEFAULT_TEXELS_PER_UNIT
+            texelsPerUnit: texelsPerUnit || DEFAULT_TEXELS_PER_UNIT
           }
         );
 
@@ -131,7 +136,7 @@ const IrradianceSceneManager: React.FC<{
         const [irradiance, irradianceData] = createRendererTexture(
           lightMapWidth,
           lightMapHeight,
-          textureFilterRef.current || THREE.LinearFilter
+          textureFilter || THREE.LinearFilter
         );
 
         // perform atlas mapping
@@ -140,12 +145,12 @@ const IrradianceSceneManager: React.FC<{
 
         // set up workbench
         setWorkbench({
-          aoMode: aoModeRef.current,
-          aoDistance: aoDistanceRef.current || DEFAULT_AO_DISTANCE,
+          aoMode: !!ao,
+          aoDistance: aoDistance || DEFAULT_AO_DISTANCE,
           emissiveMultiplier:
-            emissiveMultiplierRef.current === undefined
+            emissiveMultiplier === undefined
               ? DEFAULT_EMISSIVE_MULTIPLIER
-              : emissiveMultiplierRef.current,
+              : emissiveMultiplier,
 
           lightScene: scene,
           atlasMap,
@@ -153,7 +158,7 @@ const IrradianceSceneManager: React.FC<{
           irradiance,
           irradianceData,
 
-          settings: settingsRef.current
+          settings: settings
         });
       }
 
@@ -175,7 +180,7 @@ const IrradianceSceneManager: React.FC<{
 
   return (
     <IrradianceDebugContext.Provider value={debugInfo}>
-      {children(workbench, startHandler)}
+      {props.children(workbench, startHandler)}
     </IrradianceDebugContext.Provider>
   );
 };
