@@ -2,15 +2,9 @@ import * as THREE from 'three';
 
 import { scanAtlasTexels } from './atlas';
 import { Workbench } from './workbench';
-import {
-  ProbeBatchReader,
-  withLightProbe,
-  generatePixelAreaLookup
-} from './lightProbe';
+import { withLightProbe } from './lightProbe';
 
 const MAX_PASSES = 2;
-
-const tmpRgba = new THREE.Vector4();
 
 // applied inside the light probe scene
 function createTemporaryLightMapTexture(
@@ -37,60 +31,6 @@ function createTemporaryLightMapTexture(
   return [texture, data];
 }
 
-// collect and combine pixel aggregate from rendered probe viewports
-// (this ignores the alpha channel from viewports)
-function readTexel(
-  rgba: THREE.Vector4,
-  readLightProbe: ProbeBatchReader,
-  probePixelAreaLookup: number[]
-) {
-  let r = 0,
-    g = 0,
-    b = 0,
-    totalDivider = 0;
-
-  for (const {
-    rgbaData: probeData,
-    rowPixelStride,
-    probeBox: box,
-    originX,
-    originY
-  } of readLightProbe()) {
-    const probeTargetSize = box.z; // assuming width is always full
-
-    const rowStride = rowPixelStride * 4;
-    let rowStart = box.y * rowStride + box.x * 4;
-    const totalMax = (box.y + box.w) * rowStride;
-    let py = originY;
-
-    while (rowStart < totalMax) {
-      const rowMax = rowStart + box.z * 4;
-      let px = originX;
-
-      for (let i = rowStart; i < rowMax; i += 4) {
-        // compute multiplier as affected by inclination of corresponding ray
-        const area = probePixelAreaLookup[py * probeTargetSize + px];
-
-        r += area * probeData[i];
-        g += area * probeData[i + 1];
-        b += area * probeData[i + 2];
-
-        totalDivider += area;
-
-        px += 1;
-      }
-
-      rowStart += rowStride;
-      py += 1;
-    }
-  }
-
-  // alpha is set later
-  rgba.x = r / totalDivider;
-  rgba.y = g / totalDivider;
-  rgba.z = b / totalDivider;
-}
-
 // offsets for 3x3 brush
 const offDirX = [1, 1, 0, -1, -1, -1, 0, 1];
 const offDirY = [0, 1, 1, 1, 0, -1, -1, -1];
@@ -100,15 +40,16 @@ function storeLightMapValue(
   atlasWidth: number,
   totalTexelCount: number,
   texelIndex: number,
+  rgba: THREE.Vector4,
   passOutputData: Float32Array
 ) {
   // read existing texel value (if adding)
   const mainOffTexelBase = texelIndex * 4;
 
-  tmpRgba.w = 1; // reset alpha to 1 to indicate filled pixel
+  rgba.w = 1; // reset alpha to 1 to indicate filled pixel
 
   // main texel write
-  tmpRgba.toArray(passOutputData, mainOffTexelBase);
+  rgba.toArray(passOutputData, mainOffTexelBase);
 
   // propagate combined value to 3x3 brush area
   const texelX = texelIndex % atlasWidth;
@@ -132,7 +73,7 @@ function storeLightMapValue(
 
     if (offTexelFaceEnc === 0 && (isStrongNeighbour || isUnfilled)) {
       // no need to separately read existing value for brush-propagated texels
-      tmpRgba.toArray(passOutputData, offTexelBase);
+      rgba.toArray(passOutputData, offTexelBase);
     }
   }
 }
@@ -149,11 +90,6 @@ export async function runBakingPasses(
       const { atlasMap, irradiance, irradianceData } = workbench;
       const { width: atlasWidth, height: atlasHeight } = atlasMap;
       const totalTexelCount = atlasWidth * atlasHeight;
-
-      // @todo make this async?
-      const probePixelAreaLookup = generatePixelAreaLookup(
-        workbench.settings.targetSize
-      );
 
       for (let passCount = 0; passCount < MAX_PASSES; passCount += 1) {
         // set up a new output texture for new pass
@@ -172,18 +108,18 @@ export async function runBakingPasses(
         while (!texelsDone) {
           const gl = await requestWork();
 
-          for (const {
-            texelIndex,
-            partsReader: readLightProbe
-          } of renderLightProbeBatch(gl, workbench.lightScene, texelIterator)) {
-            readTexel(tmpRgba, readLightProbe, probePixelAreaLookup);
-
+          for (const { texelIndex, rgba } of renderLightProbeBatch(
+            gl,
+            workbench.lightScene,
+            texelIterator
+          )) {
             // store resulting total illumination
             storeLightMapValue(
               atlasMap.data,
               atlasWidth,
               totalTexelCount,
               texelIndex,
+              rgba,
               passOutputData
             );
 

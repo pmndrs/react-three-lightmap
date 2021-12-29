@@ -49,15 +49,13 @@ export interface ProbeTexel {
   pV: number;
 }
 
-export type ProbeBatchReader = () => Generator<ProbeDataReport>;
-
 export type ProbeBatcher = (
   gl: THREE.WebGLRenderer,
   lightScene: THREE.Scene,
   texelIterator: Iterator<ProbeTexel | null>
 ) => Generator<{
   texelIndex: number;
-  partsReader: ProbeBatchReader;
+  rgba: THREE.Vector4;
 }>;
 
 // bilinear interpolation of normals in triangle, with normalization
@@ -165,6 +163,61 @@ export function generatePixelAreaLookup(probeTargetSize: number) {
   return lookup;
 }
 
+// collect and combine pixel aggregate from rendered probe viewports
+// (this ignores the alpha channel from viewports)
+const tmpTexelRGBA = new THREE.Vector4();
+
+function readTexel(
+  readLightProbe: () => Generator<ProbeDataReport>,
+  probePixelAreaLookup: number[]
+) {
+  let r = 0,
+    g = 0,
+    b = 0,
+    totalDivider = 0;
+
+  for (const {
+    rgbaData: probeData,
+    rowPixelStride,
+    probeBox: box,
+    originX,
+    originY
+  } of readLightProbe()) {
+    const probeTargetSize = box.z; // assuming width is always full
+
+    const rowStride = rowPixelStride * 4;
+    let rowStart = box.y * rowStride + box.x * 4;
+    const totalMax = (box.y + box.w) * rowStride;
+    let py = originY;
+
+    while (rowStart < totalMax) {
+      const rowMax = rowStart + box.z * 4;
+      let px = originX;
+
+      for (let i = rowStart; i < rowMax; i += 4) {
+        // compute multiplier as affected by inclination of corresponding ray
+        const area = probePixelAreaLookup[py * probeTargetSize + px];
+
+        r += area * probeData[i];
+        g += area * probeData[i + 1];
+        b += area * probeData[i + 2];
+
+        totalDivider += area;
+
+        px += 1;
+      }
+
+      rowStart += rowStride;
+      py += 1;
+    }
+  }
+
+  // alpha is set later
+  tmpTexelRGBA.x = r / totalDivider;
+  tmpTexelRGBA.y = g / totalDivider;
+  tmpTexelRGBA.z = b / totalDivider;
+}
+
 // @todo use light sphere for AO (double-check that far-extent is radius + epsilon)
 export async function withLightProbe(
   aoMode: boolean,
@@ -182,6 +235,9 @@ export async function withLightProbe(
 
   const targetWidth = probeTargetSize * 4; // 4 tiles across
   const targetHeight = probeTargetSize * 2 * PROBE_BATCH_COUNT; // 2 tiles x batch count
+
+  // @todo make this async?
+  const probePixelAreaLookup = generatePixelAreaLookup(probeTargetSize);
 
   // set up simple rasterization for pure data consumption
   const probeTarget = new THREE.WebGLRenderTarget(targetWidth, targetHeight, {
@@ -463,7 +519,10 @@ export async function withLightProbe(
         yield probeDataReport;
       };
 
-      yield { texelIndex: renderedTexelIndex, partsReader: probePartsReporter };
+      // aggregate the probe target pixels
+      readTexel(probePartsReporter, probePixelAreaLookup);
+
+      yield { texelIndex: renderedTexelIndex, rgba: tmpTexelRGBA };
     }
   };
 
