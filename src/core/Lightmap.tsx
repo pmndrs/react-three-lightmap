@@ -46,12 +46,6 @@ export const LightmapIgnore: React.FC = ({ children }) => {
   );
 };
 
-const LocalSuspender: React.FC = () => {
-  // always suspend
-  const completionPromise = useMemo(() => new Promise(() => undefined), []);
-  throw completionPromise;
-};
-
 export const DebugContext = React.createContext<{
   atlasTexture: THREE.Texture;
   outputTexture: THREE.Texture;
@@ -73,30 +67,38 @@ async function runWorkflow(
 
 const LightmapMain: React.FC<
   WorkbenchSettings & {
-    onComplete: () => void;
     children: (startWorkbench: (scene: THREE.Scene) => void) => React.ReactNode;
   }
 > = (props) => {
   // read once
   const propsRef = useRef(props);
 
-  // always have latest callback reference
-  const onCompleteRef = useRef(props.onComplete);
-  onCompleteRef.current = props.onComplete;
-
   const requestWork = useWorkRequest();
 
   // debug reference to workbench for intermediate display
   const [workbench, setWorkbench] = useState<Workbench | null>(null);
 
+  const [progress, setProgress] = useState<{
+    promise: Promise<void>;
+    isComplete: boolean;
+  } | null>(null);
+
   const startHandler = useCallback(
     (scene: THREE.Scene) => {
       // not tracking unmount here because the work manager will bail out anyway when unmounted early
-      runWorkflow(scene, propsRef.current, requestWork, (debugWorkbench) => {
-        setWorkbench(debugWorkbench);
-      }).then(() => {
-        onCompleteRef.current();
+      const promise = runWorkflow(
+        scene,
+        propsRef.current,
+        requestWork,
+        (debugWorkbench) => {
+          setWorkbench(debugWorkbench);
+        }
+      ).then(() => {
+        // @todo how well does this work while we are suspended?
+        setProgress({ promise, isComplete: true });
       });
+
+      setProgress({ promise, isComplete: false });
     },
     [requestWork]
   );
@@ -112,6 +114,11 @@ const LightmapMain: React.FC<
     [workbench]
   );
 
+  // suspend while our own processing is going on
+  if (progress && !progress.isComplete) {
+    throw progress.promise;
+  }
+
   return (
     <DebugContext.Provider value={debugInfo}>
       {props.children(startHandler)}
@@ -125,16 +132,9 @@ const Lightmap = React.forwardRef<
   THREE.Scene,
   React.PropsWithChildren<LightmapProps>
 >(({ children, ...props }, sceneRef) => {
-  const [isComplete, setIsComplete] = useState(false);
-
   return (
     <WorkManager>
-      <LightmapMain
-        {...props}
-        onComplete={() => {
-          setIsComplete(true);
-        }}
-      >
+      <LightmapMain {...props}>
         {(startWorkbench) => (
           <>
             <IrradianceScene ref={sceneRef} onReady={startWorkbench}>
@@ -143,8 +143,6 @@ const Lightmap = React.forwardRef<
           </>
         )}
       </LightmapMain>
-
-      {!isComplete && <LocalSuspender />}
     </WorkManager>
   );
 });
