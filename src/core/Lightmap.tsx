@@ -64,6 +64,33 @@ async function runWorkflow(
   });
 }
 
+const Suspender: React.FC<{ promise: Promise<void> }> = ({ promise }) => {
+  throw promise;
+};
+
+const SuspenseFallbackIntercept: React.FC<{
+  onStarted: (promise: Promise<void>) => void;
+}> = ({ onStarted }) => {
+  const onStartedRef = useRef(onStarted);
+  onStartedRef.current = onStarted;
+
+  useLayoutEffect(() => {
+    let onFinished = () => {};
+    const unmountPromise = new Promise<void>((resolve) => {
+      onFinished = resolve;
+    });
+
+    onStartedRef.current(unmountPromise);
+
+    return () => {
+      onFinished();
+    };
+  }, []);
+
+  // parent will re-suspend with own long-running promise
+  return null;
+};
+
 const LightmapMain: React.FC<
   WorkbenchSettings & {
     children: React.ReactElement;
@@ -82,26 +109,35 @@ const LightmapMain: React.FC<
     isComplete: boolean;
   } | null>(null);
 
+  const legacySuspenseWaitPromiseRef = useRef<Promise<void> | null>(null);
   const sceneRef = useRef<unknown>();
   useLayoutEffect(() => {
-    const scene = sceneRef.current;
-    if (!scene || !(scene instanceof THREE.Scene)) {
-      throw new Error('expecting lightmap scene');
-    }
+    // await until wrapped scene is loaded, if suspense was triggered
+    const sceneReadyPromise =
+      legacySuspenseWaitPromiseRef.current || Promise.resolve();
 
-    // not tracking unmount here because the work manager will bail out anyway when unmounted early
-    // @todo check if this runs multiple times on some React versions???
-    const promise = runWorkflow(
-      scene,
-      propsRef.current,
-      requestWork,
-      (debugWorkbench) => {
-        setWorkbench(debugWorkbench);
-      }
-    ).then(() => {
-      // @todo how well does this work while we are suspended?
-      setProgress({ promise, isComplete: true });
-    });
+    const promise = sceneReadyPromise
+      .then(() => {
+        const scene = sceneRef.current;
+        if (!scene || !(scene instanceof THREE.Scene)) {
+          throw new Error('expecting lightmap scene');
+        }
+
+        // not tracking unmount here because the work manager will bail out anyway when unmounted early
+        // @todo check if this runs multiple times on some React versions???
+        return runWorkflow(
+          scene,
+          propsRef.current,
+          requestWork,
+          (debugWorkbench) => {
+            setWorkbench(debugWorkbench);
+          }
+        );
+      })
+      .then(() => {
+        // @todo how well does this work while we are suspended?
+        setProgress({ promise, isComplete: true });
+      });
 
     setProgress({ promise, isComplete: false });
   }, [requestWork]);
@@ -117,18 +153,27 @@ const LightmapMain: React.FC<
     [workbench]
   );
 
-  // suspend while our own processing is going on
-  if (progress && !progress.isComplete) {
-    throw progress.promise;
-  }
-
   // wrap scene in an extra group object
   // so that when this is hidden during suspension only the wrapper has visible=false
   return (
     <DebugContext.Provider value={debugInfo}>
-      <group name="Lightmap Scene Wrapper">
-        {React.cloneElement(props.children, { ref: sceneRef })}
-      </group>
+      {progress && !progress.isComplete ? (
+        <Suspender promise={progress.promise} />
+      ) : null}
+
+      <React.Suspense
+        fallback={
+          <SuspenseFallbackIntercept
+            onStarted={(promise) => {
+              legacySuspenseWaitPromiseRef.current = promise;
+            }}
+          />
+        }
+      >
+        <group name="Lightmap Scene Wrapper">
+          {React.cloneElement(props.children, { ref: sceneRef })}
+        </group>
+      </React.Suspense>
     </DebugContext.Provider>
   );
 };
