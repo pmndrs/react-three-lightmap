@@ -94,6 +94,7 @@ const LegacySuspenseFallbackIntercept: React.FC<{
 
 const LightmapMain: React.FC<
   WorkbenchSettings & {
+    disabled?: boolean;
     legacySuspense?: boolean;
     children: React.ReactElement;
   }
@@ -103,6 +104,11 @@ const LightmapMain: React.FC<
   const isLegacyRef = useRef(!!props.legacySuspense);
 
   const requestWork = useWorkRequest();
+
+  // disabled prop can start out true and become false, but afterwards we ignore it
+  const enabledRef = useRef(!props.disabled);
+  enabledRef.current = enabledRef.current || !props.disabled;
+  const allowStart = enabledRef.current;
 
   // debug reference to workbench for intermediate display
   const [workbench, setWorkbench] = useState<Workbench | null>(null);
@@ -115,6 +121,11 @@ const LightmapMain: React.FC<
   const legacySuspenseWaitPromiseRef = useRef<Promise<void> | null>(null);
   const sceneRef = useRef<unknown>();
   useLayoutEffect(() => {
+    // ignore if nothing to do yet
+    if (!allowStart) {
+      return;
+    }
+
     // await until wrapped scene is loaded, if suspense was triggered
     const sceneReadyPromise =
       legacySuspenseWaitPromiseRef.current || Promise.resolve();
@@ -143,7 +154,7 @@ const LightmapMain: React.FC<
       });
 
     setProgress({ promise, isComplete: false });
-  }, [requestWork]);
+  }, [allowStart, requestWork]);
 
   const debugInfo = useMemo(
     () =>
@@ -193,8 +204,9 @@ const LightmapMain: React.FC<
 
 // set "legacySuspense" to correctly wait for content load in legacy Suspense mode
 export type LightmapProps = WorkbenchSettings & {
-  workPerFrame?: number;
+  disabled?: boolean;
   legacySuspense?: boolean;
+  workPerFrame?: number;
 };
 
 const Lightmap = React.forwardRef<
