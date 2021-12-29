@@ -12,10 +12,7 @@ import IrradianceSceneManager from './IrradianceSceneManager';
 import WorkManager from './WorkManager';
 import IrradianceRenderer from './IrradianceRenderer';
 import IrradianceScene from './IrradianceScene';
-import {
-  LightProbeSettings,
-  DEFAULT_LIGHT_PROBE_SETTINGS
-} from './IrradianceLightProbe';
+import { LightProbeSettings, DEFAULT_LIGHT_PROBE_SETTINGS } from './lightProbe';
 
 // prevent automatic generation of UV2 coordinates for content
 // (but still allow contribution to lightmap, for e.g. emissive objects, large occluders, etc)

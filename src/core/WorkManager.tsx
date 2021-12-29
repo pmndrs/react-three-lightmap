@@ -1,124 +1,142 @@
-import React, { useEffect, useMemo, useCallback, useRef } from 'react';
+import React, {
+  useEffect,
+  useCallback,
+  useMemo,
+  useRef,
+  useContext
+} from 'react';
 import { useThree } from '@react-three/fiber';
 
 const WORK_PER_FRAME = 2;
 
-type WorkCallback = (gl: THREE.WebGLRenderer) => void;
-type WorkManagerHook = (callback: WorkCallback | null) => void;
-export const WorkManagerContext = React.createContext<WorkManagerHook | null>(
+export type WorkRequester = () => Promise<THREE.WebGLRenderer>;
+export const WorkManagerContext = React.createContext<WorkRequester | null>(
   null
 );
 
-interface RendererJobInfo {
-  id: number;
-  callbackRef: React.MutableRefObject<WorkCallback | null>;
+interface WorkTask {
+  resolve: (gl: THREE.WebGLRenderer) => void;
+  reject: (error: unknown) => void;
 }
 
-// this runs inside the renderer hook instance
-function useJobInstance(
-  jobCountRef: React.MutableRefObject<number>,
-  jobs: RendererJobInfo[],
-  callback: WorkCallback | null
-) {
-  // unique job ID
-  const jobId = useMemo<number>(() => {
-    // generate new job ID on mount
-    jobCountRef.current += 1;
-    return jobCountRef.current;
-  }, [jobCountRef]);
-
-  // wrap latest callback in stable ref
-  const callbackRef = useRef(callback);
-  callbackRef.current = callback;
-
-  // add or update job object (preserving the order)
-  useEffect(() => {
-    const jobInfo = {
-      id: jobId,
-      callbackRef
-    };
-
-    const jobIndex = jobs.findIndex((job) => job.id === jobId);
-    if (jobIndex === -1) {
-      jobs.push(jobInfo);
-    } else {
-      jobs[jobIndex] = jobInfo;
-    }
-
-    // clean up on unmount
-    return () => {
-      // remove job object with our ID
-      const currentJobIndex = jobs.findIndex((job) => job.id === jobId);
-      if (currentJobIndex !== -1) {
-        jobs.splice(currentJobIndex, 1);
-      }
-    };
-  }, [jobId, jobs]);
-}
-
-function createRAF(cb: () => void) {
-  const signal = { stop: false };
-
-  function frame() {
-    if (signal.stop) {
-      return;
-    }
-
-    cb();
-    requestAnimationFrame(frame);
+export function useWorkRequest() {
+  const requester = useContext(WorkManagerContext);
+  if (!requester) {
+    throw new Error('must be inside work manager');
   }
 
-  // kick off first frame
-  requestAnimationFrame(frame);
+  // track on-unmount callback
+  const unmountedCbRef = useRef(() => {});
+  useEffect(() => {
+    return () => {
+      unmountedCbRef.current();
+    };
+  }, []);
 
-  return signal;
+  // wrap requester with local unmount check as well
+  const wrappedRequester = useMemo(() => {
+    // reject when this is unmounted
+    const whenUnmounted = new Promise<void>((resolve) => {
+      unmountedCbRef.current = resolve;
+    }).then(() => {
+      throw new Error('work requester was unmounted');
+    });
+
+    // silence the rejection in case this is never listened to
+    whenUnmounted.catch(() => {
+      // no-op
+    });
+
+    // combine the normal RAF promise with the unmount rejection
+    return () =>
+      Promise.race<THREE.WebGLRenderer>([whenUnmounted, requester()]);
+  }, [requester]);
+
+  return wrappedRequester;
 }
 
 // this simply acts as a central spot to schedule per-frame work
-// (allowing eventual possibility of e.g. multiple unrelated renderers co-existing within a single central work manager)
+// (allowing eventual possibility of e.g. multiple unrelated bakers co-existing within a single central work manager)
+// @todo switch to on-demand RAF instead of loop
 const WorkManager: React.FC = ({ children }) => {
-  const jobCountRef = useRef(0);
-  const jobsRef = useRef<RendererJobInfo[]>([]);
+  const { gl } = useThree(); // @todo use state selector
 
-  const hook = useCallback<WorkManagerHook>((callback) => {
-    useJobInstance(jobCountRef, jobsRef.current, callback); // eslint-disable-line react-hooks/rules-of-hooks
+  const rafActiveRef = useRef(false);
+  const pendingTasksRef = useRef<WorkTask[]>([]);
+
+  const unmountedRef = useRef(false);
+  useEffect(() => {
+    return () => {
+      // prevent further scheduling
+      unmountedRef.current = true;
+
+      // clear out all the pending tasks
+      const cleanupList = [...pendingTasksRef.current];
+      pendingTasksRef.current.length = 0;
+
+      // safely notify existing awaiters that no more work can be done at all
+      // (this helps clean up async jobs that were already scheduled)
+      for (const task of cleanupList) {
+        try {
+          task.reject(
+            new Error('work manager was unmounted while waiting for RAF')
+          );
+        } catch (_error) {
+          // no-op
+        }
+      }
+    };
   }, []);
 
-  // actual per-frame work invocation
-  const { gl } = useThree();
-  useEffect(() => {
-    const signal = createRAF(() => {
-      // get active job, if any
-      const activeJob = jobsRef.current.find(
-        (job) => !!job.callbackRef.current
-      );
+  // awaitable request for next microtask inside RAF
+  const requestWork = useCallback(() => {
+    // this helps break out of long-running async jobs
+    if (unmountedRef.current) {
+      throw new Error('work manager is no longer available');
+    }
 
-      // check if there is nothing to do
-      if (!activeJob) {
-        return;
-      }
+    // schedule next RAF if needed
+    if (!rafActiveRef.current) {
+      rafActiveRef.current = true;
 
-      // invoke work callback
-      for (let i = 0; i < WORK_PER_FRAME; i += 1) {
-        // check if callback is still around (might go away mid-batch)
-        const callback = activeJob.callbackRef.current;
+      function rafRun() {
+        for (let i = 0; i < WORK_PER_FRAME; i += 1) {
+          if (pendingTasksRef.current.length === 0) {
+            // break out and stop the RAF loop for now
+            rafActiveRef.current = false;
+            return;
+          }
 
-        if (!callback) {
-          return;
+          // pick random microtask to run
+          const taskIndex = Math.floor(
+            Math.random() * pendingTasksRef.current.length
+          );
+          const task = pendingTasksRef.current[taskIndex];
+          pendingTasksRef.current.splice(taskIndex, 1);
+
+          // @todo await this before finishing RAF macro task
+          task.resolve(gl);
         }
 
-        callback(gl);
+        // schedule more work right away in case more tasks are around
+        requestAnimationFrame(rafRun);
       }
-    });
 
-    return () => {
-      signal.stop = true;
-    };
+      requestAnimationFrame(rafRun);
+    }
+
+    // schedule the microtask
+    return new Promise<THREE.WebGLRenderer>((resolve, reject) => {
+      pendingTasksRef.current.push({
+        resolve,
+        reject
+      });
+    });
   }, [gl]);
 
   return (
     <>
-      <WorkManagerContext.Provider value={hook}>
+      <WorkManagerContext.Provider value={requestWork}>
         {children}
       </WorkManagerContext.Provider>
     </>

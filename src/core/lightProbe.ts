@@ -1,7 +1,4 @@
-import { useEffect, useMemo } from 'react';
 import * as THREE from 'three';
-
-import { AtlasMapItem } from './IrradianceAtlasMapper';
 
 const tmpOrigin = new THREE.Vector3();
 const tmpU = new THREE.Vector3();
@@ -35,30 +32,33 @@ export const DEFAULT_LIGHT_PROBE_SETTINGS: LightProbeSettings = {
   far: 50
 };
 
-export type ProbeDataHandler = (
-  rgbaData: Float32Array,
-  rowPixelStride: number,
-  probeBox: THREE.Vector4,
-  originX: number, // device coordinates of lower-left corner of the viewbox
-  originY: number
-) => void;
+export type ProbeDataReport = {
+  rgbaData: Float32Array;
+  rowPixelStride: number;
+  probeBox: THREE.Vector4;
+  originX: number; // device coordinates of lower-left corner of the viewbox
+  originY: number;
+};
 
-export type ProbeBatchRenderer = (
-  texelIndex: number,
-  atlasMapItem: AtlasMapItem,
-  faceIndex: number,
-  pU: number,
-  pV: number
-) => void;
+export interface ProbeTexel {
+  texelIndex: number; // used by caller for correlation
+  originalMesh: THREE.Mesh;
+  originalBuffer: THREE.BufferGeometry;
+  faceIndex: number;
+  pU: number;
+  pV: number;
+}
 
-export type ProbeBatchReader = (handleProbeData: ProbeDataHandler) => void;
+export type ProbeBatchReader = () => Generator<ProbeDataReport>;
 
 export type ProbeBatcher = (
   gl: THREE.WebGLRenderer,
   lightScene: THREE.Scene,
-  batchItemCallback: (renderer: ProbeBatchRenderer) => void,
-  batchResultCallback: (batchIndex: number, reader: ProbeBatchReader) => void
-) => void;
+  texelIterator: Iterator<ProbeTexel | null>
+) => Generator<{
+  texelIndex: number;
+  partsReader: ProbeBatchReader;
+}>;
 
 // bilinear interpolation of normals in triangle, with normalization
 function setBlendedNormal(
@@ -136,90 +136,76 @@ function setUpProbeSide(
   probeCam.applyMatrix4(mesh.matrixWorld);
 }
 
+// for each pixel in the individual probe viewport, compute contribution to final tally
+// (edges are weaker because each pixel covers less of a view angle)
+// @todo perform weighted pixel averaging/etc all in this file
+export function generatePixelAreaLookup(probeTargetSize: number) {
+  const probePixelCount = probeTargetSize * probeTargetSize;
+  const lookup = new Array(probePixelCount) as number[];
+
+  const probePixelBias = 0.5 / probeTargetSize;
+
+  for (let py = 0; py < probeTargetSize; py += 1) {
+    // compute offset from center (with a bias for target pixel size)
+    const dy = py / probeTargetSize - 0.5 + probePixelBias;
+
+    for (let px = 0; px < probeTargetSize; px += 1) {
+      // compute offset from center (with a bias for target pixel size)
+      const dx = px / probeTargetSize - 0.5 + probePixelBias;
+
+      // compute multiplier as affected by inclination of corresponding ray
+      const span = Math.hypot(dx * 2, dy * 2);
+      const hypo = Math.hypot(span, 1);
+      const area = 1 / hypo;
+
+      lookup[py * probeTargetSize + px] = area;
+    }
+  }
+
+  return lookup;
+}
+
 // @todo use light sphere for AO (double-check that far-extent is radius + epsilon)
-export function useLightProbe(
+export async function withLightProbe(
   aoMode: boolean,
   aoDistance: number,
-  settings: LightProbeSettings
-): {
-  renderLightProbeBatch: ProbeBatcher;
-  probePixelAreaLookup: number[];
-  debugLightProbeTexture: THREE.Texture;
-} {
+  settings: LightProbeSettings,
+  taskCallback: (
+    renderLightProbeBatch: ProbeBatcher,
+    debugLightProbeTexture: THREE.Texture
+  ) => Promise<void>
+) {
   const probeTargetSize = settings.targetSize;
   const probeBgColor = aoMode ? PROBE_BG_FULL : PROBE_BG_ZERO;
 
-  const probePixelCount = probeTargetSize * probeTargetSize;
   const halfSize = probeTargetSize / 2;
 
   const targetWidth = probeTargetSize * 4; // 4 tiles across
   const targetHeight = probeTargetSize * 2 * PROBE_BATCH_COUNT; // 2 tiles x batch count
 
-  const probeTarget = useMemo(() => {
-    // set up simple rasterization for pure data consumption
-    return new THREE.WebGLRenderTarget(targetWidth, targetHeight, {
-      type: THREE.FloatType,
-      magFilter: THREE.NearestFilter,
-      minFilter: THREE.NearestFilter,
-      generateMipmaps: false
-    });
-  }, [targetWidth, targetHeight]);
+  // set up simple rasterization for pure data consumption
+  const probeTarget = new THREE.WebGLRenderTarget(targetWidth, targetHeight, {
+    type: THREE.FloatType,
+    magFilter: THREE.NearestFilter,
+    minFilter: THREE.NearestFilter,
+    generateMipmaps: false
+  });
 
-  useEffect(
-    () => () => {
-      // clean up on unmount
-      probeTarget.dispose();
-    },
-    [probeTarget]
-  );
+  const rtFov = 90; // view cone must be quarter of the hemisphere
+  const rtAspect = 1; // square render target
+  const rtNear = settings.near;
+  const rtFar = aoMode ? aoDistance : settings.far; // in AO mode, lock far-extent to requested distance
+  const probeCam = new THREE.PerspectiveCamera(rtFov, rtAspect, rtNear, rtFar);
 
-  // for each pixel in the individual probe viewport, compute contribution to final tally
-  // (edges are weaker because each pixel covers less of a view angle)
-  const probePixelAreaLookup = useMemo(() => {
-    const lookup = new Array(probePixelCount);
-
-    const probePixelBias = 0.5 / probeTargetSize;
-
-    for (let py = 0; py < probeTargetSize; py += 1) {
-      // compute offset from center (with a bias for target pixel size)
-      const dy = py / probeTargetSize - 0.5 + probePixelBias;
-
-      for (let px = 0; px < probeTargetSize; px += 1) {
-        // compute offset from center (with a bias for target pixel size)
-        const dx = px / probeTargetSize - 0.5 + probePixelBias;
-
-        // compute multiplier as affected by inclination of corresponding ray
-        const span = Math.hypot(dx * 2, dy * 2);
-        const hypo = Math.hypot(span, 1);
-        const area = 1 / hypo;
-
-        lookup[py * probeTargetSize + px] = area;
-      }
-    }
-
-    return lookup;
-  }, [probePixelCount, probeTargetSize]);
-
-  const probeCam = useMemo(() => {
-    const rtFov = 90; // view cone must be quarter of the hemisphere
-    const rtAspect = 1; // square render target
-    const rtNear = settings.near;
-    const rtFar = aoMode ? aoDistance : settings.far; // in AO mode, lock far-extent to requested distance
-    return new THREE.PerspectiveCamera(rtFov, rtAspect, rtNear, rtFar);
-  }, [aoMode, aoDistance, settings]);
-
-  const probeData = useMemo(() => {
-    return new Float32Array(targetWidth * targetHeight * 4);
-  }, [targetWidth, targetHeight]);
+  const probeData = new Float32Array(targetWidth * targetHeight * 4);
 
   const batchTexels = new Array(PROBE_BATCH_COUNT) as (number | undefined)[];
 
   // @todo ensure there is biasing to be in middle of texel physical square
-  const renderLightProbeBatch: ProbeBatcher = function renderLightProbeBatch(
+  const renderLightProbeBatch: ProbeBatcher = function* renderLightProbeBatch(
     gl,
     lightScene,
-    batchItemCallback,
-    batchResultCallback
+    texelIterator
   ) {
     // save existing renderer state
     gl.getClearColor(tmpPrevClearColor);
@@ -243,16 +229,17 @@ export function useLightProbe(
     gl.clear(true, true, false);
 
     for (let batchItem = 0; batchItem < PROBE_BATCH_COUNT; batchItem += 1) {
-      batchTexels[batchItem] = undefined;
+      const texelResult = texelIterator.next();
 
-      batchItemCallback((texelIndex, atlasMapItem, faceIndex, pU, pV) => {
+      if (!texelResult.done && texelResult.value) {
+        const { texelIndex, originalMesh, originalBuffer, faceIndex, pU, pV } =
+          texelResult.value;
+
         // each batch is 2 tiles high
         const batchOffsetY = batchItem * probeTargetSize * 2;
 
         // save which texel is being rendered for later reporting
         batchTexels[batchItem] = texelIndex;
-
-        const { originalMesh, originalBuffer } = atlasMapItem;
 
         if (!originalBuffer.index) {
           throw new Error('expected indexed mesh');
@@ -385,10 +372,9 @@ export function useLightProbe(
         );
         gl.setRenderTarget(probeTarget); // propagate latest target params
         gl.render(lightScene, probeCam);
-      });
-
-      // if nothing was rendered there is no need to finish the batch
-      if (batchTexels[batchItem] === undefined) {
+      } else {
+        // if nothing else to render, mark the end of batch and finish
+        batchTexels[batchItem] = undefined;
         break;
       }
     }
@@ -418,10 +404,18 @@ export function useLightProbe(
         break;
       }
 
-      batchResultCallback(renderedTexelIndex, (handleProbeData) => {
-        // each batch is 2 tiles high
+      // each batch is 2 tiles high
+      const probePartsReporter = function* () {
         const batchOffsetY = batchItem * probeTargetSize * 2;
         const rowPixelStride = probeTargetSize * 4;
+
+        const probeDataReport: ProbeDataReport = {
+          rgbaData: probeData,
+          rowPixelStride,
+          probeBox: tmpProbeBox,
+          originX: 0, // filled in later
+          originY: 0
+        };
 
         tmpProbeBox.set(
           0,
@@ -429,10 +423,14 @@ export function useLightProbe(
           probeTargetSize,
           probeTargetSize
         );
-        handleProbeData(probeData, rowPixelStride, tmpProbeBox, 0, 0);
+        probeDataReport.originX = 0;
+        probeDataReport.originY = 0;
+        yield probeDataReport;
 
         tmpProbeBox.set(0, batchOffsetY + halfSize, probeTargetSize, halfSize);
-        handleProbeData(probeData, rowPixelStride, tmpProbeBox, 0, halfSize);
+        probeDataReport.originX = 0;
+        probeDataReport.originX = halfSize;
+        yield probeDataReport;
 
         tmpProbeBox.set(
           probeTargetSize,
@@ -440,7 +438,9 @@ export function useLightProbe(
           probeTargetSize,
           halfSize
         );
-        handleProbeData(probeData, rowPixelStride, tmpProbeBox, 0, halfSize);
+        probeDataReport.originX = 0;
+        probeDataReport.originX = halfSize;
+        yield probeDataReport;
 
         tmpProbeBox.set(
           probeTargetSize * 2,
@@ -448,7 +448,9 @@ export function useLightProbe(
           probeTargetSize,
           halfSize
         );
-        handleProbeData(probeData, rowPixelStride, tmpProbeBox, 0, halfSize);
+        probeDataReport.originX = 0;
+        probeDataReport.originX = halfSize;
+        yield probeDataReport;
 
         tmpProbeBox.set(
           probeTargetSize * 3,
@@ -456,14 +458,19 @@ export function useLightProbe(
           probeTargetSize,
           halfSize
         );
-        handleProbeData(probeData, rowPixelStride, tmpProbeBox, 0, halfSize);
-      });
+        probeDataReport.originX = 0;
+        probeDataReport.originX = halfSize;
+        yield probeDataReport;
+      };
+
+      yield { texelIndex: renderedTexelIndex, partsReader: probePartsReporter };
     }
   };
 
-  return {
-    renderLightProbeBatch,
-    probePixelAreaLookup,
-    debugLightProbeTexture: probeTarget.texture
-  };
+  try {
+    await taskCallback(renderLightProbeBatch, probeTarget.texture);
+  } finally {
+    // always clean up regardless of error state
+    probeTarget.dispose();
+  }
 }
