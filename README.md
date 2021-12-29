@@ -4,9 +4,9 @@
 
 ![example screenshot of lightmap baker output](./react-three-lightmap-example.png)
 
-[See example live editable sandbox](https://codesandbox.io/s/github/pmndrs/react-three-lightmap/tree/main/demo-sandbox).
+[See example live editable sandbox](https://codesandbox.io/s/github/pmndrs/react-three-lightmap/tree/v0.0.2/demo-sandbox).
 
-NOTE: add `mode="legacy"` to your `<Canvas>` tag to enable legacy React suspense mode in r3f, this is a current limitation of the library.
+NOTE: if you are using `mode="legacy"` on your `<Canvas>` tag please add `legacySuspense` flag to the lightmap, otherwise it will not wait until your scene content is fully loaded. This is not an issue in most situations, unless you have explicitly set the mode prop on `<Canvas>`.
 
 ## Local Development
 

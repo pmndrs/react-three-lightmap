@@ -3,7 +3,7 @@
  * Licensed under the MIT license
  */
 
-import React, { useState, useMemo, useCallback, useRef } from 'react';
+import React, { useState, useMemo, useLayoutEffect, useRef } from 'react';
 import * as THREE from 'three';
 
 import { AUTO_UV2_OPT_OUT_FLAG } from './AutoUV2';
@@ -12,7 +12,6 @@ import { withLightScene, SCENE_OPT_OUT_FLAG } from './lightScene';
 import { initializeWorkbench, Workbench, WorkbenchSettings } from './workbench';
 import { runBakingPasses } from './bake';
 import WorkManager, { useWorkRequest } from './WorkManager';
-import IrradianceScene from './IrradianceScene';
 
 // prevent automatic generation of UV2 coordinates for content
 // (but still allow contribution to lightmap, for e.g. emissive objects, large occluders, etc)
@@ -46,12 +45,6 @@ export const LightmapIgnore: React.FC = ({ children }) => {
   );
 };
 
-const LocalSuspender: React.FC = () => {
-  // always suspend
-  const completionPromise = useMemo(() => new Promise(() => undefined), []);
-  throw completionPromise;
-};
-
 export const DebugContext = React.createContext<{
   atlasTexture: THREE.Texture;
   outputTexture: THREE.Texture;
@@ -71,35 +64,86 @@ async function runWorkflow(
   });
 }
 
+const Suspender: React.FC<{ promise: Promise<void> }> = ({ promise }) => {
+  throw promise;
+};
+
+// simply expose a promise that completes when this element is unmounted
+const LegacySuspenseFallbackIntercept: React.FC<{
+  onStarted: (promise: Promise<void>) => void;
+}> = ({ onStarted }) => {
+  const onStartedRef = useRef(onStarted);
+  onStartedRef.current = onStarted;
+
+  useLayoutEffect(() => {
+    let onFinished = () => {};
+    const unmountPromise = new Promise<void>((resolve) => {
+      onFinished = resolve;
+    });
+
+    onStartedRef.current(unmountPromise);
+
+    return () => {
+      onFinished();
+    };
+  }, []);
+
+  // parent will re-suspend with own long-running promise
+  return null;
+};
+
 const LightmapMain: React.FC<
   WorkbenchSettings & {
-    onComplete: () => void;
-    children: (startWorkbench: (scene: THREE.Scene) => void) => React.ReactNode;
+    legacySuspense?: boolean;
+    children: React.ReactElement;
   }
 > = (props) => {
   // read once
   const propsRef = useRef(props);
-
-  // always have latest callback reference
-  const onCompleteRef = useRef(props.onComplete);
-  onCompleteRef.current = props.onComplete;
+  const isLegacyRef = useRef(!!props.legacySuspense);
 
   const requestWork = useWorkRequest();
 
   // debug reference to workbench for intermediate display
   const [workbench, setWorkbench] = useState<Workbench | null>(null);
 
-  const startHandler = useCallback(
-    (scene: THREE.Scene) => {
-      // not tracking unmount here because the work manager will bail out anyway when unmounted early
-      runWorkflow(scene, propsRef.current, requestWork, (debugWorkbench) => {
-        setWorkbench(debugWorkbench);
-      }).then(() => {
-        onCompleteRef.current();
+  const [progress, setProgress] = useState<{
+    promise: Promise<void>;
+    isComplete: boolean;
+  } | null>(null);
+
+  const legacySuspenseWaitPromiseRef = useRef<Promise<void> | null>(null);
+  const sceneRef = useRef<unknown>();
+  useLayoutEffect(() => {
+    // await until wrapped scene is loaded, if suspense was triggered
+    const sceneReadyPromise =
+      legacySuspenseWaitPromiseRef.current || Promise.resolve();
+
+    const promise = sceneReadyPromise
+      .then(() => {
+        const scene = sceneRef.current;
+        if (!scene || !(scene instanceof THREE.Scene)) {
+          throw new Error('expecting lightmap scene');
+        }
+
+        // not tracking unmount here because the work manager will bail out anyway when unmounted early
+        // @todo check if this runs multiple times on some React versions???
+        return runWorkflow(
+          scene,
+          propsRef.current,
+          requestWork,
+          (debugWorkbench) => {
+            setWorkbench(debugWorkbench);
+          }
+        );
+      })
+      .then(() => {
+        // @todo how well does this work while we are suspended?
+        setProgress({ promise, isComplete: true });
       });
-    },
-    [requestWork]
-  );
+
+    setProgress({ promise, isComplete: false });
+  }, [requestWork]);
 
   const debugInfo = useMemo(
     () =>
@@ -112,39 +156,57 @@ const LightmapMain: React.FC<
     [workbench]
   );
 
+  // wrap scene in an extra group object
+  // so that when this is hidden during suspension only the wrapper has visible=false
+  const content = (
+    <group name="Lightmap Scene Wrapper">
+      {React.cloneElement(props.children, { ref: sceneRef })}
+    </group>
+  );
+
   return (
     <DebugContext.Provider value={debugInfo}>
-      {props.children(startHandler)}
+      {progress && !progress.isComplete ? (
+        <Suspender promise={progress.promise} />
+      ) : null}
+
+      {isLegacyRef.current ? (
+        // in legacy suspense mode, our effect runs before content may load
+        // so we use a special "detector"  to see when the content suspense is complete
+        <React.Suspense
+          fallback={
+            <LegacySuspenseFallbackIntercept
+              onStarted={(promise) => {
+                legacySuspenseWaitPromiseRef.current = promise;
+              }}
+            />
+          }
+        >
+          {content}
+        </React.Suspense>
+      ) : (
+        content
+      )}
     </DebugContext.Provider>
   );
 };
 
-export type LightmapProps = WorkbenchSettings;
+// set "legacySuspense" to correctly wait for content load in legacy Suspense mode
+export type LightmapProps = WorkbenchSettings & {
+  legacySuspense?: boolean;
+};
 
 const Lightmap = React.forwardRef<
   THREE.Scene,
   React.PropsWithChildren<LightmapProps>
 >(({ children, ...props }, sceneRef) => {
-  const [isComplete, setIsComplete] = useState(false);
-
   return (
     <WorkManager>
-      <LightmapMain
-        {...props}
-        onComplete={() => {
-          setIsComplete(true);
-        }}
-      >
-        {(startWorkbench) => (
-          <>
-            <IrradianceScene ref={sceneRef} onReady={startWorkbench}>
-              {children}
-            </IrradianceScene>
-          </>
-        )}
+      <LightmapMain {...props}>
+        <scene name="Lightmap Scene" ref={sceneRef}>
+          {children}
+        </scene>
       </LightmapMain>
-
-      {!isComplete && <LocalSuspender />}
     </WorkManager>
   );
 });
