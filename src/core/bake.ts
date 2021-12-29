@@ -1,11 +1,7 @@
-import React, { useEffect, useState, useRef } from 'react';
-import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 
-import { useWorkRequest } from './WorkManager';
-import { scanAtlasTexels } from './IrradianceAtlasMapper';
-import { Workbench } from './IrradianceSceneManager';
-import { withLightScene } from './lightScene';
+import { scanAtlasTexels } from './atlas';
+import { Workbench } from './workbench';
 import {
   ProbeBatchReader,
   withLightProbe,
@@ -141,7 +137,7 @@ function storeLightMapValue(
   }
 }
 
-async function runBakingPasses(
+export async function runBakingPasses(
   workbench: Workbench,
   requestWork: () => Promise<THREE.WebGLRenderer>
 ) {
@@ -209,46 +205,8 @@ async function runBakingPasses(
   );
 }
 
-// individual renderer worker lifecycle instance
-// (in parent, key to workbench.id to restart on changes)
-// @todo report completed flag
-const IrradianceRenderer: React.FC<{
-  workbench: Workbench;
-  onComplete: () => void;
-  onDebugLightProbe?: (debugLightProbeTexture: THREE.Texture) => void;
-}> = (props) => {
-  // read once
-  const workbenchRef = useRef(props.workbench);
-
-  // wrap params in ref to avoid unintended re-triggering
-  const onCompleteRef = useRef(props.onComplete);
-  onCompleteRef.current = props.onComplete;
-  const onDebugLightProbeRef = useRef(props.onDebugLightProbe);
-  onDebugLightProbeRef.current = props.onDebugLightProbe;
-
-  const [outputIsComplete, setOutputIsComplete] = useState(false);
-  const requestWork = useWorkRequest();
-
-  // light scene setup
-  useEffect(() => {
-    // notify parent once scene cleanup is done
-    if (outputIsComplete) {
-      onCompleteRef.current();
-      return;
-    }
-
-    const workbench = workbenchRef.current;
-
-    // not tracking unmount here because the work manager will bail out anyway when unmounted early
-    withLightScene(workbench, () =>
-      runBakingPasses(workbench, requestWork)
-    ).then(() => {
-      setOutputIsComplete(true);
-    });
-  }, [outputIsComplete, requestWork]);
-
-  // debug probe @todo rewrite
-  /*
+// debug probe @todo rewrite
+/*
   const { renderLightProbeBatch: debugProbeBatch, debugLightProbeTexture } =
     useLightProbe(
       workbenchRef.current.aoMode,
@@ -286,9 +244,4 @@ const IrradianceRenderer: React.FC<{
       onDebugLightProbeRef.current(debugLightProbeTexture);
     }
   }, [debugLightProbeTexture]);
-  */
-
-  return null;
-};
-
-export default IrradianceRenderer;
+*/

@@ -57,7 +57,7 @@ export function useWorkRequest() {
 
 // this simply acts as a central spot to schedule per-frame work
 // (allowing eventual possibility of e.g. multiple unrelated bakers co-existing within a single central work manager)
-// @todo switch to on-demand RAF instead of loop
+// @todo use parent context if available
 const WorkManager: React.FC = ({ children }) => {
   const { gl } = useThree(); // @todo use state selector
 
