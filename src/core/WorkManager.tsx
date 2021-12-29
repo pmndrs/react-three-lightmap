@@ -17,6 +17,7 @@ export const WorkManagerContext = React.createContext<WorkRequester | null>(
 interface WorkTask {
   resolve: (gl: THREE.WebGLRenderer) => void;
   reject: (error: unknown) => void;
+  promise: Promise<unknown> | null;
 }
 
 export function useWorkRequest() {
@@ -54,6 +55,9 @@ export function useWorkRequest() {
 
   return wrappedRequester;
 }
+
+const DUMMY_RESOLVER = (_gl: THREE.WebGLRenderer) => {};
+const DUMMY_REJECTOR = (_error: unknown) => {};
 
 // this simply acts as a central spot to schedule per-frame work
 // (allowing eventual possibility of e.g. multiple unrelated bakers co-existing within a single central work manager)
@@ -99,7 +103,7 @@ const WorkManager: React.FC = ({ children }) => {
     if (!rafActiveRef.current) {
       rafActiveRef.current = true;
 
-      function rafRun() {
+      async function rafRun() {
         for (let i = 0; i < WORK_PER_FRAME; i += 1) {
           if (pendingTasksRef.current.length === 0) {
             // break out and stop the RAF loop for now
@@ -114,8 +118,13 @@ const WorkManager: React.FC = ({ children }) => {
           const task = pendingTasksRef.current[taskIndex];
           pendingTasksRef.current.splice(taskIndex, 1);
 
-          // @todo await this before finishing RAF macro task
+          // notify pending worker
           task.resolve(gl);
+
+          // give worker enough time to finish and possibly queue more work
+          // to be run as part of this macrotask's frame
+          await task.promise;
+          await task.promise; // @todo this second await seems to make a difference to let worker finish on time!
         }
 
         // schedule more work right away in case more tasks are around
@@ -126,12 +135,21 @@ const WorkManager: React.FC = ({ children }) => {
     }
 
     // schedule the microtask
-    return new Promise<THREE.WebGLRenderer>((resolve, reject) => {
-      pendingTasksRef.current.push({
-        resolve,
-        reject
-      });
+    let taskResolve = DUMMY_RESOLVER;
+    let taskReject = DUMMY_REJECTOR;
+
+    const promise = new Promise<THREE.WebGLRenderer>((resolve, reject) => {
+      taskResolve = resolve;
+      taskReject = reject;
     });
+
+    pendingTasksRef.current.push({
+      resolve: taskResolve,
+      reject: taskReject,
+      promise: promise
+    });
+
+    return promise;
   }, [gl]);
 
   return (
