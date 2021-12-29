@@ -3,11 +3,12 @@
  * Licensed under the MIT license
  */
 
-import React, { useState, useMemo, useContext } from 'react';
+import React, { useState, useMemo } from 'react';
 import * as THREE from 'three';
 
 import { AUTO_UV2_OPT_OUT_FLAG } from './AutoUV2';
 import { ATLAS_OPT_OUT_FLAG } from './atlas';
+import { SCENE_OPT_OUT_FLAG } from './lightScene';
 import IrradianceSceneManager from './IrradianceSceneManager';
 import WorkManager from './WorkManager';
 import IrradianceRenderer from './IrradianceRenderer';
@@ -19,7 +20,7 @@ import { LightProbeSettings, DEFAULT_LIGHT_PROBE_SETTINGS } from './lightProbe';
 export const AutoUV2Ignore: React.FC = ({ children }) => {
   return (
     <group
-      name="Auto-UV2 opt out wrapper"
+      name="Auto-UV2 opt-out wrapper"
       userData={{
         [AUTO_UV2_OPT_OUT_FLAG]: true
       }}
@@ -29,18 +30,14 @@ export const AutoUV2Ignore: React.FC = ({ children }) => {
   );
 };
 
-// if there is no context provider, default to "not in progress"
-const LightmapProgressContext = React.createContext(false);
-
 // prevent wrapped content from affecting the lightmap
+// (hide during baking so that this content does not contribute to irradiance)
 export const LightmapIgnore: React.FC = ({ children }) => {
-  const inProgress = useContext(LightmapProgressContext);
-
   return (
     <group
-      name="Lightmap opt out wrapper"
-      visible={!inProgress} // hide during baking so that this content does not contribute to irradiance
+      name="Lightmap opt-out wrapper"
       userData={{
+        [SCENE_OPT_OUT_FLAG]: true,
         [AUTO_UV2_OPT_OUT_FLAG]: true, // no need for auto-UV2 if ignored during baking
         [ATLAS_OPT_OUT_FLAG]: true // no point in including this in atlas
       }}
@@ -114,22 +111,20 @@ const Lightmap = React.forwardRef<
           }}
         >
           {(workbench, startWorkbench) => (
-            <LightmapProgressContext.Provider value={!isComplete}>
-              <>
-                {workbench && !isComplete && (
-                  <IrradianceRenderer
-                    workbench={workbench}
-                    onComplete={() => {
-                      setIsComplete(true);
-                    }}
-                  />
-                )}
-              </>
+            <>
+              {workbench && !isComplete && (
+                <IrradianceRenderer
+                  workbench={workbench}
+                  onComplete={() => {
+                    setIsComplete(true);
+                  }}
+                />
+              )}
 
               <IrradianceScene ref={sceneRef} onReady={startWorkbench}>
                 {children}
               </IrradianceScene>
-            </LightmapProgressContext.Provider>
+            </>
           )}
         </IrradianceSceneManager>
 

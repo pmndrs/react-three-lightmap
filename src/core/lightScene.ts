@@ -2,6 +2,9 @@ import * as THREE from 'three';
 import { traverseAtlasItems } from './atlas';
 import { Workbench } from './IrradianceSceneManager';
 
+// hide item while baking
+export const SCENE_OPT_OUT_FLAG = Symbol('lightmap scene bake opt out flag');
+
 type SupportedMaterial =
   | THREE.MeshLambertMaterial
   | THREE.MeshPhongMaterial
@@ -33,14 +36,22 @@ export async function withLightScene(
 
   // process relevant meshes
   const meshCleanupList: THREE.Mesh[] = [];
-  const lightCleanupList: THREE.Light[] = [];
+  const suppressedCleanupList: THREE.Object3D[] = [];
 
   traverseAtlasItems(lightScene, (object) => {
+    // suppress opt-out items
+    if (
+      Object.prototype.hasOwnProperty.call(object.userData, SCENE_OPT_OUT_FLAG)
+    ) {
+      object.visible = false;
+      suppressedCleanupList.push(object);
+      return;
+    }
+
     // hide any visible lights to prevent interfering with AO
     if (aoMode && object instanceof THREE.Light && object.visible) {
       object.visible = false;
-      lightCleanupList.push(object);
-
+      suppressedCleanupList.push(object);
       return;
     }
 
@@ -150,9 +161,9 @@ export async function withLightScene(
       lightScene.remove(aoSceneLight);
     }
 
-    // re-enable scene lights
-    lightCleanupList.forEach((light) => {
-      light.visible = true;
+    // re-enable suppressed items (and lights if AO)
+    suppressedCleanupList.forEach((object) => {
+      object.visible = true;
     });
 
     // replace staging material with original
