@@ -68,7 +68,8 @@ const Suspender: React.FC<{ promise: Promise<void> }> = ({ promise }) => {
   throw promise;
 };
 
-const SuspenseFallbackIntercept: React.FC<{
+// simply expose a promise that completes when this element is unmounted
+const LegacySuspenseFallbackIntercept: React.FC<{
   onStarted: (promise: Promise<void>) => void;
 }> = ({ onStarted }) => {
   const onStartedRef = useRef(onStarted);
@@ -93,11 +94,13 @@ const SuspenseFallbackIntercept: React.FC<{
 
 const LightmapMain: React.FC<
   WorkbenchSettings & {
+    legacySuspense?: boolean;
     children: React.ReactElement;
   }
 > = (props) => {
   // read once
   const propsRef = useRef(props);
+  const isLegacyRef = useRef(!!props.legacySuspense);
 
   const requestWork = useWorkRequest();
 
@@ -155,30 +158,43 @@ const LightmapMain: React.FC<
 
   // wrap scene in an extra group object
   // so that when this is hidden during suspension only the wrapper has visible=false
+  const content = (
+    <group name="Lightmap Scene Wrapper">
+      {React.cloneElement(props.children, { ref: sceneRef })}
+    </group>
+  );
+
   return (
     <DebugContext.Provider value={debugInfo}>
       {progress && !progress.isComplete ? (
         <Suspender promise={progress.promise} />
       ) : null}
 
-      <React.Suspense
-        fallback={
-          <SuspenseFallbackIntercept
-            onStarted={(promise) => {
-              legacySuspenseWaitPromiseRef.current = promise;
-            }}
-          />
-        }
-      >
-        <group name="Lightmap Scene Wrapper">
-          {React.cloneElement(props.children, { ref: sceneRef })}
-        </group>
-      </React.Suspense>
+      {isLegacyRef.current ? (
+        // in legacy suspense mode, our effect runs before content may load
+        // so we use a special "detector"  to see when the content suspense is complete
+        <React.Suspense
+          fallback={
+            <LegacySuspenseFallbackIntercept
+              onStarted={(promise) => {
+                legacySuspenseWaitPromiseRef.current = promise;
+              }}
+            />
+          }
+        >
+          {content}
+        </React.Suspense>
+      ) : (
+        content
+      )}
     </DebugContext.Provider>
   );
 };
 
-export type LightmapProps = WorkbenchSettings;
+// set "legacySuspense" to correctly wait for content load in legacy Suspense mode
+export type LightmapProps = WorkbenchSettings & {
+  legacySuspense?: boolean;
+};
 
 const Lightmap = React.forwardRef<
   THREE.Scene,
