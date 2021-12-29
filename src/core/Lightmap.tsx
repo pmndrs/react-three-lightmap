@@ -123,9 +123,13 @@ const LightmapMain: React.FC<
     throw progress.promise;
   }
 
+  // wrap scene in an extra group object
+  // so that when this is hidden during suspension only the wrapper has visible=false
   return (
     <DebugContext.Provider value={debugInfo}>
-      {React.cloneElement(props.children, { ref: sceneRef })}
+      <group name="Lightmap Scene Wrapper">
+        {React.cloneElement(props.children, { ref: sceneRef })}
+      </group>
     </DebugContext.Provider>
   );
 };
