@@ -12,7 +12,6 @@ import { withLightScene, SCENE_OPT_OUT_FLAG } from './lightScene';
 import { initializeWorkbench, Workbench, WorkbenchSettings } from './workbench';
 import { runBakingPasses } from './bake';
 import WorkManager, { useWorkRequest } from './WorkManager';
-import IrradianceScene from './IrradianceScene';
 
 // prevent automatic generation of UV2 coordinates for content
 // (but still allow contribution to lightmap, for e.g. emissive objects, large occluders, etc)
