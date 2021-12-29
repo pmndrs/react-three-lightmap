@@ -1,7 +1,5 @@
-import React, { useState, useMemo, useCallback, useRef } from 'react';
 import * as THREE from 'three';
 
-import { useWorkRequest } from './WorkManager';
 import { renderAtlas, AtlasMap } from './atlas';
 import { LightProbeSettings, DEFAULT_LIGHT_PROBE_SETTINGS } from './lightProbe';
 import { computeAutoUV2Layout } from './AutoUV2';
