@@ -29,7 +29,7 @@ export const Main: Story = () => (
   >
     <DebugOverlayRenderer>
       <React.Suspense fallback={<Spinner />}>
-        <Lightmap ao texelsPerUnit={3}>
+        <Lightmap ao texelsPerUnit={3} workPerFrame={4}>
           <mesh position={[0, 0, 0]} castShadow receiveShadow>
             <boxBufferGeometry attach="geometry" args={[3, 3, 1]} />
             <meshLambertMaterial attach="material" color="#ff6080" />

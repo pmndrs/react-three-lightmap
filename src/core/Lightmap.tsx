@@ -193,15 +193,16 @@ const LightmapMain: React.FC<
 
 // set "legacySuspense" to correctly wait for content load in legacy Suspense mode
 export type LightmapProps = WorkbenchSettings & {
+  workPerFrame?: number;
   legacySuspense?: boolean;
 };
 
 const Lightmap = React.forwardRef<
   THREE.Scene,
   React.PropsWithChildren<LightmapProps>
->(({ children, ...props }, sceneRef) => {
+>(({ workPerFrame, children, ...props }, sceneRef) => {
   return (
-    <WorkManager>
+    <WorkManager workPerFrame={workPerFrame}>
       <LightmapMain {...props}>
         <scene name="Lightmap Scene" ref={sceneRef}>
           {children}

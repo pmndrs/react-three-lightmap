@@ -7,7 +7,7 @@ import React, {
 } from 'react';
 import { useThree } from '@react-three/fiber';
 
-const WORK_PER_FRAME = 2;
+const DEFAULT_WORK_PER_FRAME = 2;
 
 export type WorkRequester = () => Promise<THREE.WebGLRenderer>;
 export const WorkManagerContext = React.createContext<WorkRequester | null>(
@@ -62,8 +62,15 @@ const DUMMY_REJECTOR = (_error: unknown) => {};
 // this simply acts as a central spot to schedule per-frame work
 // (allowing eventual possibility of e.g. multiple unrelated bakers co-existing within a single central work manager)
 // @todo use parent context if available
-const WorkManager: React.FC = ({ children }) => {
+const WorkManager: React.FC<{ workPerFrame?: number }> = ({
+  workPerFrame,
+  children
+}) => {
   const { gl } = useThree(); // @todo use state selector
+
+  const workPerFrameReal = Math.max(1, workPerFrame || DEFAULT_WORK_PER_FRAME);
+  const workPerFrameRef = useRef(workPerFrameReal);
+  workPerFrameRef.current = workPerFrameReal;
 
   const rafActiveRef = useRef(false);
   const pendingTasksRef = useRef<WorkTask[]>([]);
@@ -104,7 +111,7 @@ const WorkManager: React.FC = ({ children }) => {
       rafActiveRef.current = true;
 
       async function rafRun() {
-        for (let i = 0; i < WORK_PER_FRAME; i += 1) {
+        for (let i = 0; i < workPerFrameRef.current; i += 1) {
           if (pendingTasksRef.current.length === 0) {
             // break out and stop the RAF loop for now
             rafActiveRef.current = false;
