@@ -7,7 +7,7 @@ import React, { useState, useMemo, useContext } from 'react';
 import * as THREE from 'three';
 
 import { AUTO_UV2_OPT_OUT_FLAG } from './AutoUV2';
-import { ATLAS_OPT_OUT_FLAG } from './IrradianceAtlasMapper';
+import { ATLAS_OPT_OUT_FLAG } from './atlas';
 import IrradianceSceneManager from './IrradianceSceneManager';
 import WorkManager from './WorkManager';
 import IrradianceRenderer from './IrradianceRenderer';
@@ -99,7 +99,7 @@ const Lightmap = React.forwardRef<
     const [isComplete, setIsComplete] = useState(false);
 
     return (
-      <>
+      <WorkManager>
         <IrradianceSceneManager
           aoMode={!!aoMode}
           aoDistance={aoDistance}
@@ -115,7 +115,7 @@ const Lightmap = React.forwardRef<
         >
           {(workbench, startWorkbench) => (
             <LightmapProgressContext.Provider value={!isComplete}>
-              <WorkManager>
+              <>
                 {workbench && !isComplete && (
                   <IrradianceRenderer
                     workbench={workbench}
@@ -124,7 +124,7 @@ const Lightmap = React.forwardRef<
                     }}
                   />
                 )}
-              </WorkManager>
+              </>
 
               <IrradianceScene ref={sceneRef} onReady={startWorkbench}>
                 {children}
@@ -134,7 +134,7 @@ const Lightmap = React.forwardRef<
         </IrradianceSceneManager>
 
         {!isComplete && <LocalSuspender />}
-      </>
+      </WorkManager>
     );
   }
 );

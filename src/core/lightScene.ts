@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { traverseAtlasItems } from './IrradianceAtlasMapper';
+import { traverseAtlasItems } from './atlas';
 import { Workbench } from './IrradianceSceneManager';
 
 type SupportedMaterial =

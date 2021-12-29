@@ -3,7 +3,7 @@ import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 
 import { useWorkRequest } from './WorkManager';
-import { scanAtlasTexels } from './IrradianceAtlasMapper';
+import { scanAtlasTexels } from './atlas';
 import { Workbench } from './IrradianceSceneManager';
 import { withLightScene } from './lightScene';
 import {
