@@ -3,17 +3,16 @@
  * Licensed under the MIT license
  */
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useCallback, useRef } from 'react';
 import * as THREE from 'three';
 
 import { AUTO_UV2_OPT_OUT_FLAG } from './AutoUV2';
 import { ATLAS_OPT_OUT_FLAG } from './atlas';
 import { SCENE_OPT_OUT_FLAG } from './lightScene';
-import IrradianceSceneManager from './IrradianceSceneManager';
-import WorkManager from './WorkManager';
+import { initializeWorkbench, Workbench, WorkbenchSettings } from './workbench';
+import WorkManager, { useWorkRequest } from './WorkManager';
 import IrradianceRenderer from './IrradianceRenderer';
 import IrradianceScene from './IrradianceScene';
-import { LightProbeSettings } from './lightProbe';
 
 // prevent automatic generation of UV2 coordinates for content
 // (but still allow contribution to lightmap, for e.g. emissive objects, large occluders, etc)
@@ -47,77 +46,94 @@ export const LightmapIgnore: React.FC = ({ children }) => {
   );
 };
 
-// avoid using "light probe" name externally, to avoid confusion with light probe grid tech
-export type SamplerSettings = Partial<LightProbeSettings>;
-
-export interface LightmapProps {
-  ao?: boolean;
-  aoDistance?: number;
-  emissiveMultiplier?: number;
-  lightMapSize?: number | [number, number];
-  textureFilter?: THREE.TextureFilter;
-  texelsPerUnit?: number;
-  samplerSettings?: SamplerSettings;
-}
-
 const LocalSuspender: React.FC = () => {
   // always suspend
   const completionPromise = useMemo(() => new Promise(() => undefined), []);
   throw completionPromise;
 };
 
+export const DebugContext = React.createContext<{
+  atlasTexture: THREE.Texture;
+  outputTexture: THREE.Texture;
+} | null>(null);
+
+const LightmapMain: React.FC<
+  WorkbenchSettings & {
+    children: (
+      workbench: Workbench | null,
+      startWorkbench: (scene: THREE.Scene) => void
+    ) => React.ReactNode;
+  }
+> = (props) => {
+  // read once
+  const propsRef = useRef(props);
+
+  const requestWork = useWorkRequest();
+
+  // full workbench with atlas map
+  const [workbench, setWorkbench] = useState<Workbench | null>(null);
+
+  const startHandler = useCallback(
+    (scene: THREE.Scene) => {
+      initializeWorkbench(scene, propsRef.current, requestWork).then(
+        (result) => {
+          setWorkbench(result);
+        }
+      );
+    },
+    [requestWork]
+  );
+
+  const debugInfo = useMemo(
+    () =>
+      workbench
+        ? {
+            atlasTexture: workbench.atlasMap.texture,
+            outputTexture: workbench.irradiance
+          }
+        : null,
+    [workbench]
+  );
+
+  return (
+    <DebugContext.Provider value={debugInfo}>
+      {props.children(workbench, startHandler)}
+    </DebugContext.Provider>
+  );
+};
+
+export type LightmapProps = WorkbenchSettings;
+
 const Lightmap = React.forwardRef<
   THREE.Scene,
   React.PropsWithChildren<LightmapProps>
->(
-  (
-    {
-      ao,
-      aoDistance,
-      emissiveMultiplier,
-      lightMapSize,
-      textureFilter,
-      texelsPerUnit,
-      samplerSettings,
-      children
-    },
-    sceneRef
-  ) => {
-    const [isComplete, setIsComplete] = useState(false);
+>(({ children, ...props }, sceneRef) => {
+  const [isComplete, setIsComplete] = useState(false);
 
-    return (
-      <WorkManager>
-        <IrradianceSceneManager
-          ao={ao}
-          aoDistance={aoDistance}
-          emissiveMultiplier={emissiveMultiplier}
-          lightMapSize={lightMapSize}
-          textureFilter={textureFilter}
-          texelsPerUnit={texelsPerUnit}
-          samplerSettings={samplerSettings}
-        >
-          {(workbench, startWorkbench) => (
-            <>
-              {workbench && !isComplete && (
-                <IrradianceRenderer
-                  workbench={workbench}
-                  onComplete={() => {
-                    setIsComplete(true);
-                  }}
-                />
-              )}
+  return (
+    <WorkManager>
+      <LightmapMain {...props}>
+        {(workbench, startWorkbench) => (
+          <>
+            {workbench && !isComplete && (
+              <IrradianceRenderer
+                workbench={workbench}
+                onComplete={() => {
+                  setIsComplete(true);
+                }}
+              />
+            )}
 
-              <IrradianceScene ref={sceneRef} onReady={startWorkbench}>
-                {children}
-              </IrradianceScene>
-            </>
-          )}
-        </IrradianceSceneManager>
+            <IrradianceScene ref={sceneRef} onReady={startWorkbench}>
+              {children}
+            </IrradianceScene>
+          </>
+        )}
+      </LightmapMain>
 
-        {!isComplete && <LocalSuspender />}
-      </WorkManager>
-    );
-  }
-);
+      {!isComplete && <LocalSuspender />}
+    </WorkManager>
+  );
+});
 
 export default Lightmap;

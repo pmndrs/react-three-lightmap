@@ -4,7 +4,7 @@ import * as THREE from 'three';
 
 import { useWorkRequest } from './WorkManager';
 import { scanAtlasTexels } from './atlas';
-import { Workbench } from './IrradianceSceneManager';
+import { Workbench } from './workbench';
 import { withLightScene } from './lightScene';
 import {
   ProbeBatchReader,

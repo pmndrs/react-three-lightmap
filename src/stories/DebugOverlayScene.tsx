@@ -2,8 +2,7 @@ import React, { useMemo, useContext, useRef } from 'react';
 import { useFrame, useThree, createPortal } from '@react-three/fiber';
 import * as THREE from 'three';
 
-import { IrradianceDebugContext } from '../core/IrradianceSceneManager';
-// import { PROBE_BATCH_COUNT } from '../core/IrradianceLightProbe';
+import { DebugContext } from '../core/Lightmap';
 
 const DebugOverlayContext = React.createContext<THREE.Scene | null>(null);
 
@@ -47,7 +46,7 @@ export const DebugOverlayRenderer: React.FC = ({ children }) => {
 // show provided textures as widgets on debug overlay (via createPortal)
 export const DebugOverlayWidgets: React.FC = React.memo(() => {
   const debugScene = useContext(DebugOverlayContext);
-  const debugInfo = useContext(IrradianceDebugContext);
+  const debugInfo = useContext(DebugContext);
 
   if (!debugScene || !debugInfo) {
     return null;

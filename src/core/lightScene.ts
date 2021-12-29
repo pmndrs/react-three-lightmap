@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { traverseAtlasItems } from './atlas';
-import { Workbench } from './IrradianceSceneManager';
+import { Workbench } from './workbench';
 
 // hide item while baking
 export const SCENE_OPT_OUT_FLAG = Symbol('lightmap scene bake opt out flag');
