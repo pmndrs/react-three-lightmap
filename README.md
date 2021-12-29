@@ -4,7 +4,23 @@
 
 ![example screenshot of lightmap baker output](./react-three-lightmap-example.png)
 
-[See example live editable sandbox](https://codesandbox.io/s/github/pmndrs/react-three-lightmap/tree/v0.0.4/demo-sandbox).
+Example:
+
+```jsx
+<Lightmap>
+  <mesh position={[0, 0, 0]} castShadow receiveShadow>
+    <boxBufferGeometry attach="geometry" args={[3, 3, 1]} />
+    <meshStandardMaterial attach="material" color="#ff6080" />
+  </mesh>
+
+  <mesh position={[0, 0, 1.8]} castShadow receiveShadow>
+    <boxBufferGeometry attach="geometry" args={[2, 2, 2]} />
+    <meshStandardMaterial attach="material" color="#4080ff" />
+  </mesh>
+</Lightmap>
+```
+
+**[Try it in this editable sandbox](https://codesandbox.io/s/github/pmndrs/react-three-lightmap/tree/v0.0.5/demo-sandbox)**.
 
 NOTE: if you are using `mode="legacy"` on your `<Canvas>` tag please add `legacySuspense` flag to the lightmap, otherwise it will not wait until your scene content is fully loaded. This is not an issue in most situations, unless you have explicitly set the mode prop on `<Canvas>`.
 
