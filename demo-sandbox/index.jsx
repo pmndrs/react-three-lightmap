@@ -65,7 +65,6 @@ const Scene = () => {
 
 ReactDOM.render(
   <Canvas
-    mode="legacy" // legacy suspense mode is required
     camera={{ position: [-2, -4, 6], up: [0, 0, 1] }}
     shadows
     onCreated={({ gl }) => {
