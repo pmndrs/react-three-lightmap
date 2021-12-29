@@ -1,4 +1,10 @@
-import React, { useEffect, useCallback, useRef, useContext } from 'react';
+import React, {
+  useEffect,
+  useCallback,
+  useMemo,
+  useRef,
+  useContext
+} from 'react';
 import { useThree } from '@react-three/fiber';
 
 const WORK_PER_FRAME = 2;
@@ -15,12 +21,38 @@ interface WorkTask {
 
 export function useWorkRequest() {
   const requester = useContext(WorkManagerContext);
-
   if (!requester) {
     throw new Error('must be inside work manager');
   }
 
-  return requester;
+  // track on-unmount callback
+  const unmountedCbRef = useRef(() => {});
+  useEffect(() => {
+    return () => {
+      unmountedCbRef.current();
+    };
+  }, []);
+
+  // wrap requester with local unmount check as well
+  const wrappedRequester = useMemo(() => {
+    // reject when this is unmounted
+    const whenUnmounted = new Promise<void>((resolve) => {
+      unmountedCbRef.current = resolve;
+    }).then(() => {
+      throw new Error('work requester was unmounted');
+    });
+
+    // silence the rejection in case this is never listened to
+    whenUnmounted.catch(() => {
+      // no-op
+    });
+
+    // combine the normal RAF promise with the unmount rejection
+    return () =>
+      Promise.race<THREE.WebGLRenderer>([whenUnmounted, requester()]);
+  }, [requester]);
+
+  return wrappedRequester;
 }
 
 // this simply acts as a central spot to schedule per-frame work

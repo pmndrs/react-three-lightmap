@@ -227,7 +227,7 @@ const IrradianceRenderer: React.FC<{
   onDebugLightProbeRef.current = props.onDebugLightProbe;
 
   const [outputIsComplete, setOutputIsComplete] = useState(false);
-  const requestWork = useWorkRequest(!outputIsComplete);
+  const requestWork = useWorkRequest();
 
   // light scene setup
   useEffect(() => {
