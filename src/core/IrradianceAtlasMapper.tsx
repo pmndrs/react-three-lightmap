@@ -1,10 +1,4 @@
-import React, {
-  useState,
-  useMemo,
-  useEffect,
-  useRef,
-  useLayoutEffect
-} from 'react';
+import React, { useEffect, useRef } from 'react';
 import { useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 
@@ -178,17 +172,12 @@ const IrradianceAtlasMapper: React.FC<{
   const widthRef = useRef(width);
   const heightRef = useRef(height);
   const lightSceneRef = useRef(lightScene);
+  const onCompleteRef = useRef(onComplete);
 
-  // wait until next render to queue up data to render into atlas texture
-  const [inputItems, setInputItems] = useState<AtlasMapInternalItem[] | null>(
-    null
-  );
-  const [isComplete, setIsComplete] = useState<boolean>(false);
-
-  useEffect(() => {
+  function getInputItems(originalScene: THREE.Scene) {
     const items = [] as AtlasMapInternalItem[];
 
-    traverseAtlasItems(lightSceneRef.current, (mesh) => {
+    traverseAtlasItems(originalScene, (mesh) => {
       if (!(mesh instanceof THREE.Mesh)) {
         return;
       }
@@ -283,47 +272,55 @@ const IrradianceAtlasMapper: React.FC<{
       });
     });
 
-    // disposed during scene unmount
-    setInputItems(items);
-  }, []);
+    return items;
+  }
 
-  const orthoTarget = useMemo(() => {
-    // set up simple rasterization for pure data consumption
-    return new THREE.WebGLRenderTarget(widthRef.current, heightRef.current, {
-      type: THREE.FloatType,
-      magFilter: THREE.NearestFilter,
-      minFilter: THREE.NearestFilter,
-      depthBuffer: false,
-      generateMipmaps: false
-    });
-  }, []);
+  function createOrthoScene(inputItems: AtlasMapInternalItem[]) {
+    const orthoScene = new THREE.Scene();
+    orthoScene.name = 'Atlas mapper ortho scene';
 
-  useEffect(
-    () => () => {
-      // clean up on unmount
-      orthoTarget.dispose();
-    },
-    [orthoTarget]
-  );
+    for (const geom of inputItems) {
+      const mesh = new THREE.Mesh();
+      mesh.frustumCulled = false; // skip bounding box checks (not applicable and logic gets confused)
 
-  const orthoCamera = useMemo(() => {
-    return new THREE.OrthographicCamera(0, 1, 1, 0, 0, 1);
-  }, []);
+      mesh.geometry = geom.perFaceBuffer;
+      mesh.material = new THREE.ShaderMaterial({
+        side: THREE.DoubleSide,
 
-  const orthoData = useMemo(() => {
-    return new Float32Array(widthRef.current * heightRef.current * 4);
-  }, []);
+        vertexShader: VERTEX_SHADER,
+        fragmentShader: FRAGMENT_SHADER
+      });
+
+      orthoScene.add(mesh);
+    }
+
+    return orthoScene;
+  }
 
   // render the output as needed
   const { gl } = useThree();
-  const orthoSceneRef = useRef<THREE.Scene>();
 
-  useLayoutEffect(() => {
-    // nothing to do
-    const orthoScene = orthoSceneRef.current;
-    if (!inputItems || isComplete || !orthoScene) {
-      return;
-    }
+  function renderAtlas(originalScene: THREE.Scene) {
+    const inputItems = getInputItems(originalScene);
+    const orthoScene = createOrthoScene(inputItems);
+
+    // set up simple rasterization for pure data consumption
+    const orthoTarget = new THREE.WebGLRenderTarget(
+      widthRef.current,
+      heightRef.current,
+      {
+        type: THREE.FloatType,
+        magFilter: THREE.NearestFilter,
+        minFilter: THREE.NearestFilter,
+        depthBuffer: false,
+        generateMipmaps: false
+      }
+    );
+
+    const orthoCamera = new THREE.OrthographicCamera(0, 1, 1, 0, 0, 1);
+    const orthoData = new Float32Array(
+      widthRef.current * heightRef.current * 4
+    );
 
     // save existing renderer state
     const prevClearColor = new THREE.Color();
@@ -353,13 +350,19 @@ const IrradianceAtlasMapper: React.FC<{
       orthoData
     );
 
-    setIsComplete(true);
-    setInputItems(null); // release references to atlas-specific geometry clones
+    // clean up
+    orthoTarget.dispose();
 
-    onComplete({
+    onCompleteRef.current({
       width: widthRef.current,
       height: heightRef.current,
-      texture: orthoTarget.texture,
+      texture: new THREE.DataTexture(
+        orthoData,
+        widthRef.current,
+        heightRef.current,
+        THREE.RGBAFormat,
+        THREE.FloatType
+      ),
       data: orthoData,
 
       // no need to expose references to atlas-specific geometry clones
@@ -369,38 +372,13 @@ const IrradianceAtlasMapper: React.FC<{
         originalBuffer
       }))
     });
-  }, [inputItems]);
+  }
 
-  return (
-    <>
-      {inputItems && !isComplete && (
-        // wrap scene in an extra group object
-        // so that when this is hidden during suspension only the wrapper has visible=false
-        <group name="Atlas Map Suspense Wrapper">
-          <scene name="Atlas Map Generator" ref={orthoSceneRef}>
-            {inputItems.map((geom, geomIndex) => {
-              return (
-                <mesh
-                  key={geomIndex}
-                  frustumCulled={false} // skip bounding box checks (not applicable and logic gets confused)
-                  position={[0, 0, 0]}
-                >
-                  <primitive attach="geometry" object={geom.perFaceBuffer} />
+  useEffect(() => {
+    renderAtlas(lightSceneRef.current);
+  }, []);
 
-                  <shaderMaterial
-                    attach="material"
-                    side={THREE.DoubleSide}
-                    vertexShader={VERTEX_SHADER}
-                    fragmentShader={FRAGMENT_SHADER}
-                  />
-                </mesh>
-              );
-            })}
-          </scene>
-        </group>
-      )}
-    </>
-  );
+  return null;
 };
 
 export default IrradianceAtlasMapper;
