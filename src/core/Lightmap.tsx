@@ -8,10 +8,10 @@ import * as THREE from 'three';
 
 import { AUTO_UV2_OPT_OUT_FLAG } from './AutoUV2';
 import { ATLAS_OPT_OUT_FLAG } from './atlas';
-import { SCENE_OPT_OUT_FLAG } from './lightScene';
+import { withLightScene, SCENE_OPT_OUT_FLAG } from './lightScene';
 import { initializeWorkbench, Workbench, WorkbenchSettings } from './workbench';
+import { runBakingPasses } from './bake';
 import WorkManager, { useWorkRequest } from './WorkManager';
-import IrradianceRenderer from './IrradianceRenderer';
 import IrradianceScene from './IrradianceScene';
 
 // prevent automatic generation of UV2 coordinates for content
@@ -57,29 +57,46 @@ export const DebugContext = React.createContext<{
   outputTexture: THREE.Texture;
 } | null>(null);
 
+async function runWorkflow(
+  scene: THREE.Scene,
+  props: WorkbenchSettings,
+  requestWork: () => Promise<THREE.WebGLRenderer>,
+  onWorkbenchDebug: (workbench: Workbench) => void
+) {
+  const workbench = await initializeWorkbench(scene, props, requestWork);
+  onWorkbenchDebug(workbench);
+
+  await withLightScene(workbench, async () => {
+    await runBakingPasses(workbench, requestWork);
+  });
+}
+
 const LightmapMain: React.FC<
   WorkbenchSettings & {
-    children: (
-      workbench: Workbench | null,
-      startWorkbench: (scene: THREE.Scene) => void
-    ) => React.ReactNode;
+    onComplete: () => void;
+    children: (startWorkbench: (scene: THREE.Scene) => void) => React.ReactNode;
   }
 > = (props) => {
   // read once
   const propsRef = useRef(props);
 
+  // always have latest callback reference
+  const onCompleteRef = useRef(props.onComplete);
+  onCompleteRef.current = props.onComplete;
+
   const requestWork = useWorkRequest();
 
-  // full workbench with atlas map
+  // debug reference to workbench for intermediate display
   const [workbench, setWorkbench] = useState<Workbench | null>(null);
 
   const startHandler = useCallback(
     (scene: THREE.Scene) => {
-      initializeWorkbench(scene, propsRef.current, requestWork).then(
-        (result) => {
-          setWorkbench(result);
-        }
-      );
+      // not tracking unmount here because the work manager will bail out anyway when unmounted early
+      runWorkflow(scene, propsRef.current, requestWork, (debugWorkbench) => {
+        setWorkbench(debugWorkbench);
+      }).then(() => {
+        onCompleteRef.current();
+      });
     },
     [requestWork]
   );
@@ -97,7 +114,7 @@ const LightmapMain: React.FC<
 
   return (
     <DebugContext.Provider value={debugInfo}>
-      {props.children(workbench, startHandler)}
+      {props.children(startHandler)}
     </DebugContext.Provider>
   );
 };
@@ -112,18 +129,14 @@ const Lightmap = React.forwardRef<
 
   return (
     <WorkManager>
-      <LightmapMain {...props}>
-        {(workbench, startWorkbench) => (
+      <LightmapMain
+        {...props}
+        onComplete={() => {
+          setIsComplete(true);
+        }}
+      >
+        {(startWorkbench) => (
           <>
-            {workbench && !isComplete && (
-              <IrradianceRenderer
-                workbench={workbench}
-                onComplete={() => {
-                  setIsComplete(true);
-                }}
-              />
-            )}
-
             <IrradianceScene ref={sceneRef} onReady={startWorkbench}>
               {children}
             </IrradianceScene>
