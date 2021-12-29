@@ -3,7 +3,7 @@
  * Licensed under the MIT license
  */
 
-import React, { useState, useMemo, useCallback, useRef } from 'react';
+import React, { useState, useMemo, useLayoutEffect, useRef } from 'react';
 import * as THREE from 'three';
 
 import { AUTO_UV2_OPT_OUT_FLAG } from './AutoUV2';
@@ -67,7 +67,7 @@ async function runWorkflow(
 
 const LightmapMain: React.FC<
   WorkbenchSettings & {
-    children: (startWorkbench: (scene: THREE.Scene) => void) => React.ReactNode;
+    children: React.ReactElement;
   }
 > = (props) => {
   // read once
@@ -83,25 +83,29 @@ const LightmapMain: React.FC<
     isComplete: boolean;
   } | null>(null);
 
-  const startHandler = useCallback(
-    (scene: THREE.Scene) => {
-      // not tracking unmount here because the work manager will bail out anyway when unmounted early
-      const promise = runWorkflow(
-        scene,
-        propsRef.current,
-        requestWork,
-        (debugWorkbench) => {
-          setWorkbench(debugWorkbench);
-        }
-      ).then(() => {
-        // @todo how well does this work while we are suspended?
-        setProgress({ promise, isComplete: true });
-      });
+  const sceneRef = useRef<unknown>();
+  useLayoutEffect(() => {
+    const scene = sceneRef.current;
+    if (!scene || !(scene instanceof THREE.Scene)) {
+      throw new Error('expecting lightmap scene');
+    }
 
-      setProgress({ promise, isComplete: false });
-    },
-    [requestWork]
-  );
+    // not tracking unmount here because the work manager will bail out anyway when unmounted early
+    // @todo check if this runs multiple times on some React versions???
+    const promise = runWorkflow(
+      scene,
+      propsRef.current,
+      requestWork,
+      (debugWorkbench) => {
+        setWorkbench(debugWorkbench);
+      }
+    ).then(() => {
+      // @todo how well does this work while we are suspended?
+      setProgress({ promise, isComplete: true });
+    });
+
+    setProgress({ promise, isComplete: false });
+  }, [requestWork]);
 
   const debugInfo = useMemo(
     () =>
@@ -121,7 +125,7 @@ const LightmapMain: React.FC<
 
   return (
     <DebugContext.Provider value={debugInfo}>
-      {props.children(startHandler)}
+      {React.cloneElement(props.children, { ref: sceneRef })}
     </DebugContext.Provider>
   );
 };
@@ -135,13 +139,9 @@ const Lightmap = React.forwardRef<
   return (
     <WorkManager>
       <LightmapMain {...props}>
-        {(startWorkbench) => (
-          <>
-            <IrradianceScene ref={sceneRef} onReady={startWorkbench}>
-              {children}
-            </IrradianceScene>
-          </>
-        )}
+        <scene name="Lightmap Scene" ref={sceneRef}>
+          {children}
+        </scene>
       </LightmapMain>
     </WorkManager>
   );
