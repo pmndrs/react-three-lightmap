@@ -6,31 +6,6 @@ import { withLightProbe } from './lightProbe';
 
 const MAX_PASSES = 2;
 
-// applied inside the light probe scene
-function createTemporaryLightMapTexture(
-  atlasWidth: number,
-  atlasHeight: number
-): [THREE.Texture, Float32Array] {
-  const atlasSize = atlasWidth * atlasHeight;
-  const data = new Float32Array(4 * atlasSize);
-
-  const texture = new THREE.DataTexture(
-    data,
-    atlasWidth,
-    atlasHeight,
-    THREE.RGBAFormat,
-    THREE.FloatType
-  );
-
-  // use nearest filter inside the light probe scene for performance
-  // @todo allow tweaking?
-  texture.magFilter = THREE.NearestFilter;
-  texture.minFilter = THREE.NearestFilter;
-  texture.generateMipmaps = false;
-
-  return [texture, data];
-}
-
 // offsets for 3x3 brush
 const offDirX = [1, 1, 0, -1, -1, -1, 0, 1];
 const offDirY = [0, 1, 1, 1, 0, -1, -1, -1];
@@ -91,13 +66,12 @@ export async function runBakingPasses(
       const { width: atlasWidth, height: atlasHeight } = atlasMap;
       const totalTexelCount = atlasWidth * atlasHeight;
 
+      // set up output buffer for texel data
+      const passOutputData = new Float32Array(4 * totalTexelCount);
+
       for (let passCount = 0; passCount < MAX_PASSES; passCount += 1) {
-        // set up a new output texture for new pass
-        // @todo this might not even need to be a texture? but could be useful for live debug display
-        const [passOutput, passOutputData] = createTemporaryLightMapTexture(
-          atlasMap.width,
-          atlasMap.height
-        );
+        // reset output buffer "empty pixel" status (alpha channel)
+        passOutputData.fill(0);
 
         // main work iteration
         let texelsDone = false;
@@ -122,10 +96,6 @@ export async function runBakingPasses(
               rgba,
               passOutputData
             );
-
-            // make sure this shows up on next bounce pass
-            // @todo move?
-            passOutput.needsUpdate = true;
           }
         }
 
@@ -133,9 +103,6 @@ export async function runBakingPasses(
         // (used in the next pass and final display)
         irradianceData.set(passOutputData);
         irradiance.needsUpdate = true;
-
-        // discard this pass's output texture
-        passOutput.dispose();
       }
     }
   );
