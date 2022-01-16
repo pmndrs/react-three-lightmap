@@ -67,8 +67,15 @@ export async function withLightScene(
     // texture during bounce passes
     // (checking against accidentally overriding some unrelated lightmap)
     // @todo allow developer to also flag certain custom materials as allowed
-    const material = mesh.material;
-    if (material && !Array.isArray(material) && materialIsSupported(material)) {
+    const materialList: (THREE.Material | null)[] = Array.isArray(mesh.material)
+      ? mesh.material
+      : [mesh.material];
+
+    const stagingMaterialList = materialList.map((material) => {
+      if (!material || !materialIsSupported(material)) {
+        return material;
+      }
+
       // basic safety check
       // @todo just hide these items, maybe with a warning
       if (aoMode) {
@@ -84,14 +91,6 @@ export async function withLightScene(
           );
         }
       }
-
-      // stash original material so that we can restore it later
-      (
-        mesh.userData as UserDataStore<
-          typeof ORIGINAL_MATERIAL_KEY,
-          SupportedMaterial
-        >
-      )[ORIGINAL_MATERIAL_KEY] = material;
 
       // clone sensible presentation properties
       const stagingMaterial = new THREE.MeshPhongMaterial();
@@ -137,11 +136,24 @@ export async function withLightScene(
         stagingMaterial.lightMap = irradiance; // use the lightmap texture
       }
 
-      mesh.material = stagingMaterial;
+      return stagingMaterial;
+    });
 
-      // keep a simple list for later cleanup
-      meshCleanupList.push(mesh);
-    }
+    // stash original material list so that we can restore it later
+    (
+      mesh.userData as UserDataStore<
+        typeof ORIGINAL_MATERIAL_KEY,
+        THREE.Material[] | THREE.Material
+      >
+    )[ORIGINAL_MATERIAL_KEY] = mesh.material;
+
+    // assign updated list or single material
+    mesh.material = Array.isArray(mesh.material)
+      ? stagingMaterialList
+      : stagingMaterialList[0];
+
+    // keep a simple list for later cleanup
+    meshCleanupList.push(mesh);
   });
 
   let aoSceneLight: THREE.Light | null = null;
@@ -171,22 +183,37 @@ export async function withLightScene(
       // get stashed material and clean up object key
       const userData = mesh.userData as UserDataStore<
         typeof ORIGINAL_MATERIAL_KEY,
-        SupportedMaterial
+        THREE.Material[] | THREE.Material | null
       >;
-      const material = userData[ORIGINAL_MATERIAL_KEY];
+      const origMaterialValue = userData[ORIGINAL_MATERIAL_KEY];
       delete userData[ORIGINAL_MATERIAL_KEY];
 
-      if (material) {
-        mesh.material = material;
+      if (!origMaterialValue) {
+        console.error('lightmap baker: missing original material', mesh);
+        return;
+      }
 
-        // also fill in the resulting map
+      // restore original setting
+      mesh.material = origMaterialValue;
+
+      // also fill in the resulting map
+      // @todo keep an explicit list from above in userData?
+      const materialList: (THREE.Material | null)[] = Array.isArray(
+        origMaterialValue
+      )
+        ? origMaterialValue
+        : [origMaterialValue];
+
+      for (const material of materialList) {
+        if (!material || !materialIsSupported(material)) {
+          continue;
+        }
+
         if (aoMode) {
           material.aoMap = irradiance;
         } else {
           material.lightMap = irradiance;
         }
-      } else {
-        console.error('lightmap baker: missing original material', mesh);
       }
     });
   }
