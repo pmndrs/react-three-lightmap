@@ -130,10 +130,13 @@ export async function withLightScene(
       stagingMaterial.toneMapped = false; // must output in raw linear space
 
       // mode-specific texture setup
+      // @todo skip this if there is no uv2
       if (aoMode) {
         stagingMaterial.aoMap = irradiance; // use the AO texture
+        material.aoMap = irradiance; // set it on original material too
       } else {
         stagingMaterial.lightMap = irradiance; // use the lightmap texture
+        material.lightMap = irradiance; // set it on original material too
       }
 
       return stagingMaterial;
@@ -195,26 +198,6 @@ export async function withLightScene(
 
       // restore original setting
       mesh.material = origMaterialValue;
-
-      // also fill in the resulting map
-      // @todo keep an explicit list from above in userData?
-      const materialList: (THREE.Material | null)[] = Array.isArray(
-        origMaterialValue
-      )
-        ? origMaterialValue
-        : [origMaterialValue];
-
-      for (const material of materialList) {
-        if (!material || !materialIsSupported(material)) {
-          continue;
-        }
-
-        if (aoMode) {
-          material.aoMap = irradiance;
-        } else {
-          material.lightMap = irradiance;
-        }
-      }
     });
   }
 }
