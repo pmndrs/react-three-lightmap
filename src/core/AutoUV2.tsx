@@ -25,17 +25,24 @@ const tmpNormal2 = new THREE.Vector3();
 function findVertex(
   posArray: ArrayLike<number>,
   normalArray: ArrayLike<number>,
+  groupIndexArray: ArrayLike<number>,
   vertexIndex: number
 ): number {
   tmpVert.fromArray(posArray, vertexIndex * 3);
   tmpNormal.fromArray(normalArray, vertexIndex * 3);
+  const gi = groupIndexArray[vertexIndex];
 
   // finish search before current vertex (since latter is the fallback return)
   for (let vStart = 0; vStart < vertexIndex; vStart += 1) {
     tmpVert2.fromArray(posArray, vStart * 3);
     tmpNormal2.fromArray(normalArray, vStart * 3);
+    const gi2 = groupIndexArray[vStart];
 
-    if (tmpVert2.equals(tmpVert) && tmpNormal2.equals(tmpNormal)) {
+    if (
+      tmpVert2.equals(tmpVert) &&
+      tmpNormal2.equals(tmpNormal) &&
+      gi === gi2
+    ) {
       return vStart;
     }
   }
@@ -50,14 +57,26 @@ function convertGeometryToIndexed(buffer: THREE.BufferGeometry) {
 
   const normalArray = buffer.attributes.normal.array;
 
+  // fill out a group index lookup to keep faces separate by material
+  const origGroups = buffer.groups || [];
+
+  const groupIndexArray = new Array(posVertexCount);
+  for (const group of origGroups) {
+    groupIndexArray.fill(
+      group.materialIndex,
+      group.start,
+      Math.min(posVertexCount, group.start + group.count)
+    );
+  }
+
   const indexAttr = new THREE.Uint16BufferAttribute(faceCount * 3, 3);
   indexAttr.count = faceCount * 3; // @todo without this the mesh does not show all faces
 
   for (let faceIndex = 0; faceIndex < faceCount; faceIndex += 1) {
     const vStart = faceIndex * 3;
-    const a = findVertex(posArray, normalArray, vStart);
-    const b = findVertex(posArray, normalArray, vStart + 1);
-    const c = findVertex(posArray, normalArray, vStart + 2);
+    const a = findVertex(posArray, normalArray, groupIndexArray, vStart);
+    const b = findVertex(posArray, normalArray, groupIndexArray, vStart + 1);
+    const c = findVertex(posArray, normalArray, groupIndexArray, vStart + 2);
 
     indexAttr.setXYZ(faceIndex, a, b, c);
   }
@@ -314,14 +333,8 @@ export function computeAutoUV2Layout(
 
   // fill in local coords and compute dimensions for layout boxes based on polygon point sets inside them
   for (const layoutBox of layoutBoxes) {
-    const {
-      uAxis,
-      vAxis,
-      posArray,
-      posIndices,
-      posLocalX,
-      posLocalY
-    } = layoutBox;
+    const { uAxis, vAxis, posArray, posIndices, posLocalX, posLocalY } =
+      layoutBox;
 
     // compute min and max extents of all coords
     tmpMinLocal.set(Number.POSITIVE_INFINITY, Number.POSITIVE_INFINITY);
