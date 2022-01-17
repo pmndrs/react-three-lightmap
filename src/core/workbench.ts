@@ -8,6 +8,7 @@ export interface Workbench {
   aoMode: boolean;
   aoDistance: number;
   emissiveMultiplier: number;
+  bounceMultiplier: number;
 
   lightScene: THREE.Scene;
   atlasMap: AtlasMap;
@@ -64,6 +65,7 @@ export interface WorkbenchSettings {
   ao?: boolean;
   aoDistance?: number;
   emissiveMultiplier?: number;
+  bounceMultiplier?: number; // crank up from 1 (default) to light up the corners
   lightMapSize?: number | [number, number];
   textureFilter?: THREE.TextureFilter;
   texelsPerUnit?: number;
@@ -79,6 +81,7 @@ export async function initializeWorkbench(
     ao,
     aoDistance,
     emissiveMultiplier,
+    bounceMultiplier,
     lightMapSize,
     textureFilter,
     texelsPerUnit,
@@ -136,6 +139,7 @@ export async function initializeWorkbench(
       emissiveMultiplier === undefined
         ? DEFAULT_EMISSIVE_MULTIPLIER
         : emissiveMultiplier,
+    bounceMultiplier: bounceMultiplier === undefined ? 1 : bounceMultiplier,
 
     lightScene: scene,
     atlasMap,

@@ -32,7 +32,13 @@ export async function withLightScene(
   taskCallback: () => Promise<void>
 ) {
   // prepare the scene for baking
-  const { aoMode, emissiveMultiplier, lightScene, irradiance } = workbench;
+  const {
+    aoMode,
+    emissiveMultiplier,
+    bounceMultiplier,
+    lightScene,
+    irradiance
+  } = workbench;
 
   // process relevant meshes
   const meshCleanupList: THREE.Mesh[] = [];
@@ -132,9 +138,13 @@ export async function withLightScene(
       // mode-specific texture setup
       // @todo skip this if there is no uv2
       if (aoMode) {
+        // @todo also respect bounce multiplier here (apply as inverse to AO intensity?)
         stagingMaterial.aoMap = irradiance; // use the AO texture
         material.aoMap = irradiance; // set it on original material too
       } else {
+        // simply increase lightmap intensity for more bounce
+        stagingMaterial.lightMapIntensity = bounceMultiplier;
+
         stagingMaterial.lightMap = irradiance; // use the lightmap texture
         material.lightMap = irradiance; // set it on original material too
       }
