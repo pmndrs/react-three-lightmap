@@ -1,13 +1,13 @@
 {
   "name": "demo-sandbox",
-  "version": "0.0.5",
+  "version": "0.0.8",
   "description": "Sample @react-three/lightmap usage snippet",
   "main": "index.jsx",
   "license": "MIT",
   "dependencies": {
     "@react-three/drei": "^7.0.0",
     "@react-three/fiber": "^6.0.0",
-    "@react-three/lightmap": "^0.0.6",
+    "@react-three/lightmap": "^0.0.8",
     "react": "^17.0.1",
     "react-dom": "^17.0.1",
     "three": "^0.128.0"
