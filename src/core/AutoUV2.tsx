@@ -117,28 +117,6 @@ function guessOrthogonalOrigin(
   return minI;
 }
 
-// @todo support opt-in inside opt-out groups
-export const AUTO_UV2_OPT_OUT_FLAG = Symbol('auto-UV2 opt out flag');
-
-// based on traverse() in https://github.com/mrdoob/three.js/blob/dev/src/core/Object3D.js
-function traverseAutoUV2Items(
-  object: THREE.Object3D,
-  callback: (object: THREE.Object3D) => void
-) {
-  // skip everything inside opt-out wrappers
-  if (
-    Object.prototype.hasOwnProperty.call(object.userData, AUTO_UV2_OPT_OUT_FLAG)
-  ) {
-    return;
-  }
-
-  callback(object);
-
-  for (const childObject of object.children) {
-    traverseAutoUV2Items(childObject, callback);
-  }
-}
-
 const MAX_AUTO_SIZE = 512; // @todo make this configurable? but 512x512 is a lot to compute already
 
 function autoSelectSize(layoutSize: number): number {
@@ -173,15 +151,15 @@ export interface AutoUV2Settings {
 export function computeAutoUV2Layout(
   initialWidth: number | undefined,
   initialHeight: number | undefined,
-  scene: THREE.Scene,
+  items: Generator<THREE.Object3D, void, unknown>,
   { texelsPerUnit }: AutoUV2Settings
 ): [number, number] {
   const layoutBoxes: AutoUVBox[] = [];
   let hasPredefinedUV2 = false;
 
-  traverseAutoUV2Items(scene, (mesh) => {
+  for (const mesh of items) {
     if (!(mesh instanceof THREE.Mesh)) {
-      return;
+      continue;
     }
 
     const buffer = mesh.geometry;
@@ -219,7 +197,7 @@ export function computeAutoUV2Layout(
       }
 
       hasPredefinedUV2 = true;
-      return;
+      continue;
     }
 
     // complain if trying to compute UV2 in a scene with predefined UV2
@@ -329,7 +307,7 @@ export function computeAutoUV2Layout(
         existingBox.posLocalY.push(0); // filled later
       }
     }
-  });
+  }
 
   // fill in local coords and compute dimensions for layout boxes based on polygon point sets inside them
   for (const layoutBox of layoutBoxes) {

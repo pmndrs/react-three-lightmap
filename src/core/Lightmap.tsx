@@ -6,10 +6,14 @@
 import React, { useState, useMemo, useLayoutEffect, useRef } from 'react';
 import * as THREE from 'three';
 
-import { AUTO_UV2_OPT_OUT_FLAG } from './AutoUV2';
-import { ATLAS_OPT_OUT_FLAG } from './atlas';
-import { withLightScene, SCENE_OPT_OUT_FLAG } from './lightScene';
-import { initializeWorkbench, Workbench, WorkbenchSettings } from './workbench';
+import { withLightScene } from './lightScene';
+import {
+  initializeWorkbench,
+  Workbench,
+  WorkbenchSettings,
+  LIGHTMAP_UNMAPPED_FLAG,
+  LIGHTMAP_IGNORE_FLAG
+} from './workbench';
 import { runBakingPasses } from './bake';
 import WorkManager, { useWorkRequest } from './WorkManager';
 
@@ -20,7 +24,7 @@ export const AutoUV2Ignore: React.FC = ({ children }) => {
     <group
       name="Auto-UV2 opt-out wrapper"
       userData={{
-        [AUTO_UV2_OPT_OUT_FLAG]: true
+        [LIGHTMAP_UNMAPPED_FLAG]: true
       }}
     >
       {children}
@@ -35,9 +39,7 @@ export const LightmapIgnore: React.FC = ({ children }) => {
     <group
       name="Lightmap opt-out wrapper"
       userData={{
-        [SCENE_OPT_OUT_FLAG]: true,
-        [AUTO_UV2_OPT_OUT_FLAG]: true, // no need for auto-UV2 if ignored during baking
-        [ATLAS_OPT_OUT_FLAG]: true // no point in including this in atlas
+        [LIGHTMAP_IGNORE_FLAG]: true
       }}
     >
       {children}
@@ -206,7 +208,7 @@ const LightmapMain: React.FC<
 export type LightmapProps = WorkbenchSettings & {
   disabled?: boolean;
   legacySuspense?: boolean;
-  workPerFrame?: number;
+  workPerFrame?: number; // @todo allow fractions, dynamic value
 };
 
 const Lightmap = React.forwardRef<

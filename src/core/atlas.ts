@@ -50,29 +50,6 @@ const FRAGMENT_SHADER = `
   }
 `;
 
-// @todo support opt-in inside opt-out groups
-export const ATLAS_OPT_OUT_FLAG = Symbol('lightmap atlas opt out flag');
-
-// based on traverse() in https://github.com/mrdoob/three.js/blob/dev/src/core/Object3D.js
-// @todo ignore items with visible = false?
-export function traverseAtlasItems(
-  object: THREE.Object3D,
-  callback: (object: THREE.Object3D) => void
-) {
-  // skip everything inside opt-out wrappers
-  if (
-    Object.prototype.hasOwnProperty.call(object.userData, ATLAS_OPT_OUT_FLAG)
-  ) {
-    return;
-  }
-
-  callback(object);
-
-  for (const childObject of object.children) {
-    traverseAtlasItems(childObject, callback);
-  }
-}
-
 function getTexelInfo(
   atlasMap: AtlasMap,
   texelIndex: number
@@ -161,24 +138,24 @@ export function* scanAtlasTexels(atlasMap: AtlasMap, onFinished: () => void) {
 // with either bilinear or nearest filtering
 // @todo consider stencil buffer, or just 8bit texture
 
-function getInputItems(originalScene: THREE.Scene) {
+function getInputItems(sceneItems: Generator<THREE.Object3D, void, unknown>) {
   const items = [] as AtlasMapInternalItem[];
 
-  traverseAtlasItems(originalScene, (mesh) => {
+  for (const mesh of sceneItems) {
     if (!(mesh instanceof THREE.Mesh)) {
-      return;
+      continue;
     }
 
     // ignore anything that is not a buffer geometry with defined UV2 coordinates
     // @todo warn on legacy geometry objects if they seem to have UV2?
     const buffer = mesh.geometry;
     if (!(buffer instanceof THREE.BufferGeometry)) {
-      return;
+      continue;
     }
 
     const uv2Attr = buffer.attributes.uv2;
     if (!uv2Attr) {
-      return;
+      continue;
     }
 
     // gather other necessary attributes and ensure compatible data
@@ -253,7 +230,7 @@ function getInputItems(originalScene: THREE.Scene) {
       originalMesh: mesh,
       originalBuffer: buffer
     });
-  });
+  }
 
   return items;
 }
@@ -284,9 +261,9 @@ export function renderAtlas(
   gl: THREE.WebGLRenderer,
   width: number,
   height: number,
-  originalScene: THREE.Scene
+  sceneItems: Generator<THREE.Object3D, void, unknown>
 ) {
-  const inputItems = getInputItems(originalScene);
+  const inputItems = getInputItems(sceneItems);
   const orthoScene = createOrthoScene(inputItems);
 
   // set up simple rasterization for pure data consumption

@@ -30,6 +30,46 @@ const DEFAULT_AO_DISTANCE = 3;
 // and simply increasing their emissiveIntensity would wash out the user-visible display colours
 const DEFAULT_EMISSIVE_MULTIPLIER = 32;
 
+// flags for marking up objects in scene
+export const LIGHTMAP_IGNORE_FLAG = Symbol('lightmap ignore flag');
+export const LIGHTMAP_UNMAPPED_FLAG = Symbol('lightmap unmapped flag');
+
+const hasOwnProp = Object.prototype.hasOwnProperty;
+export function objectHasFlag(object: THREE.Object3D, flag: symbol) {
+  return hasOwnProp.call(object.userData, flag);
+}
+
+// based on traverse() in https://github.com/mrdoob/three.js/blob/dev/src/core/Object3D.js
+export function* traverseSceneItems(
+  root: THREE.Object3D,
+  ignoreUnmapped?: boolean,
+  onIgnored?: (object: THREE.Object3D) => void
+) {
+  const stack = [root];
+
+  while (stack.length > 0) {
+    const current = stack.pop()!;
+
+    // skip everything invisible and inside opt-out wrappers
+    if (
+      !current.visible ||
+      objectHasFlag(current, LIGHTMAP_IGNORE_FLAG) ||
+      (ignoreUnmapped && objectHasFlag(current, LIGHTMAP_UNMAPPED_FLAG))
+    ) {
+      if (onIgnored) {
+        onIgnored(current);
+      }
+      continue;
+    }
+
+    yield current;
+
+    for (const childObject of current.children) {
+      stack.push(childObject);
+    }
+  }
+}
+
 function createRendererTexture(
   atlasWidth: number,
   atlasHeight: number,
@@ -109,7 +149,7 @@ export async function initializeWorkbench(
   const [computedWidth, computedHeight] = computeAutoUV2Layout(
     initialWidth,
     initialHeight,
-    scene,
+    traverseSceneItems(scene, true),
     {
       texelsPerUnit: texelsPerUnit || DEFAULT_TEXELS_PER_UNIT
     }
@@ -128,8 +168,14 @@ export async function initializeWorkbench(
   );
 
   // perform atlas mapping
+  // (traversing unmapped items as well because some might have own UV2)
   const gl = await requestWork();
-  const atlasMap = renderAtlas(gl, lightMapWidth, lightMapHeight, scene);
+  const atlasMap = renderAtlas(
+    gl,
+    lightMapWidth,
+    lightMapHeight,
+    traverseSceneItems(scene, false)
+  );
 
   // set up workbench
   return {

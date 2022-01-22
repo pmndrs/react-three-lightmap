@@ -1,9 +1,5 @@
 import * as THREE from 'three';
-import { traverseAtlasItems } from './atlas';
-import { Workbench } from './workbench';
-
-// hide item while baking
-export const SCENE_OPT_OUT_FLAG = Symbol('lightmap scene bake opt out flag');
+import { Workbench, traverseSceneItems } from './workbench';
 
 type SupportedMaterial =
   | THREE.MeshLambertMaterial
@@ -44,26 +40,28 @@ export async function withLightScene(
   const meshCleanupList: THREE.Mesh[] = [];
   const suppressedCleanupList: THREE.Object3D[] = [];
 
-  traverseAtlasItems(lightScene, (object) => {
-    // suppress opt-out items
-    if (
-      Object.prototype.hasOwnProperty.call(object.userData, SCENE_OPT_OUT_FLAG)
-    ) {
-      object.visible = false;
-      suppressedCleanupList.push(object);
-      return;
+  for (const object of traverseSceneItems(
+    lightScene,
+    false,
+    (ignoredObject) => {
+      // also prevent ignored items from rendering
+      // (do nothing if already invisible to avoid setting it back to visible on cleanup)
+      if (ignoredObject.visible) {
+        ignoredObject.visible = false;
+        suppressedCleanupList.push(ignoredObject);
+      }
     }
-
+  )) {
     // hide any visible lights to prevent interfering with AO
-    if (aoMode && object instanceof THREE.Light && object.visible) {
+    if (aoMode && object instanceof THREE.Light) {
       object.visible = false;
       suppressedCleanupList.push(object);
-      return;
+      continue;
     }
 
     // simple check for type (no need to check for uv2 presence)
     if (!(object instanceof THREE.Mesh)) {
-      return;
+      continue;
     }
 
     const mesh = object;
@@ -167,7 +165,7 @@ export async function withLightScene(
 
     // keep a simple list for later cleanup
     meshCleanupList.push(mesh);
-  });
+  }
 
   let aoSceneLight: THREE.Light | null = null;
   if (aoMode) {
