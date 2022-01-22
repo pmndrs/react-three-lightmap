@@ -33,6 +33,21 @@ yarn
 yarn storybook
 ```
 
+## Wishlist
+
+- onComplete callback
+- proper denoising, calibrate the light sampler
+- much more optimization
+- composited multi-layer lightmap based on several distinct groups of light sources
+  - e.g. for individual flickering lights, neon signs, etc
+- rudimentary light probe support for dynamic meshes/sprites
+  - can start with just omnidirectional total amounts collected in 2D grid textures
+  - might want the light probe pattern to be customizable
+- bake-only lights (turned off after bake)
+  - useful for game levels - e.g. could have hundreds of lights baked in and then discarded
+  - currently the lightmap is indirect-only, so this needs an extra step to sample direct light contribution
+- saving/loading the generated lightmap texture (useful for game levels)
+
 ## Notes
 
 Based on [original experimental implementation](https://github.com/unframework/threejs-lightmap-baker) by [@unframework](https://github.com/unframework).
