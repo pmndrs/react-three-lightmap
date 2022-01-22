@@ -31,33 +31,37 @@ const DEFAULT_AO_DISTANCE = 3;
 const DEFAULT_EMISSIVE_MULTIPLIER = 32;
 
 // flags for marking up objects in scene
+// read-only flag allows preventing UV2 generation but can also allow objects that have UV2 and should be
+// in light scene, but are ignored in atlas and have their own lightmap
 export const LIGHTMAP_IGNORE_FLAG = Symbol('lightmap ignore flag');
-export const LIGHTMAP_UNMAPPED_FLAG = Symbol('lightmap unmapped flag');
+export const LIGHTMAP_READONLY_FLAG = Symbol('lightmap read-only flag');
 
 const hasOwnProp = Object.prototype.hasOwnProperty;
 export function objectHasFlag(object: THREE.Object3D, flag: symbol) {
   return hasOwnProp.call(object.userData, flag);
 }
 
+// hacky way to report current object flag while doing traverseSceneItems
+export let traversalStateIsReadOnly = false;
+
 // based on traverse() in https://github.com/mrdoob/three.js/blob/dev/src/core/Object3D.js
-// @todo in theory, there could be a need for flagging objects that have UV2 and should be
-// in light scene, but ignored in atlas and have their own lightmap
-// (really, the "unmapped" flag is not needed, and should instead be "read-only")
 export function* traverseSceneItems(
   root: THREE.Object3D,
-  ignoreUnmapped?: boolean,
+  ignoreReadOnly?: boolean,
   onIgnored?: (object: THREE.Object3D) => void
 ) {
   const stack = [root];
+  const readOnlyStack = [false];
 
   while (stack.length > 0) {
     const current = stack.pop()!;
+    const inheritReadOnly = readOnlyStack.pop()!;
 
     // skip everything invisible and inside opt-out wrappers
     if (
       !current.visible ||
       objectHasFlag(current, LIGHTMAP_IGNORE_FLAG) ||
-      (ignoreUnmapped && objectHasFlag(current, LIGHTMAP_UNMAPPED_FLAG))
+      (ignoreReadOnly && objectHasFlag(current, LIGHTMAP_READONLY_FLAG))
     ) {
       if (onIgnored) {
         onIgnored(current);
@@ -65,10 +69,18 @@ export function* traverseSceneItems(
       continue;
     }
 
+    // compute readOnly flag for current object (either directly flagged or inheriting parent's flag)
+    const activeReadOnly =
+      inheritReadOnly || objectHasFlag(current, LIGHTMAP_READONLY_FLAG);
+
+    // report to consumer
+    traversalStateIsReadOnly = activeReadOnly;
     yield current;
 
+    // recurse, letting children inherit the active/inherited readOnly flag
     for (const childObject of current.children) {
       stack.push(childObject);
+      readOnlyStack.push(activeReadOnly);
     }
   }
 }
@@ -171,13 +183,12 @@ export async function initializeWorkbench(
   );
 
   // perform atlas mapping
-  // (traversing unmapped items as well because some might have own UV2)
   const gl = await requestWork();
   const atlasMap = renderAtlas(
     gl,
     lightMapWidth,
     lightMapHeight,
-    traverseSceneItems(scene, false)
+    traverseSceneItems(scene, true)
   );
 
   // set up workbench

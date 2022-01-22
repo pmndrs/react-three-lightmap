@@ -5,7 +5,7 @@ import { OrbitControls } from '@react-three/drei';
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader';
 
-import Lightmap, { AutoUV2Ignore } from '../core/Lightmap';
+import Lightmap, { LightmapReadOnly } from '../core/Lightmap';
 import Spinner from './Spinner';
 import { DebugOverlayRenderer, DebugOverlayWidgets } from './DebugOverlayScene';
 
@@ -36,7 +36,7 @@ const MainSceneContents: React.FC = () => {
   mesh.receiveShadow = true;
 
   return (
-    <AutoUV2Ignore>
+    <LightmapReadOnly>
       <mesh position={[0, 0, -2]} receiveShadow>
         <planeBufferGeometry attach="geometry" args={[20, 20]} />
         <meshLambertMaterial
@@ -47,7 +47,7 @@ const MainSceneContents: React.FC = () => {
       </mesh>
 
       <primitive key={mesh.uuid} object={mesh} dispose={null} />
-    </AutoUV2Ignore>
+    </LightmapReadOnly>
   );
 };
 

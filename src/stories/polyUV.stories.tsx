@@ -4,7 +4,7 @@ import { Canvas } from '@react-three/fiber';
 import { OrbitControls } from '@react-three/drei';
 import * as THREE from 'three';
 
-import Lightmap, { AutoUV2Ignore } from '../core/Lightmap';
+import Lightmap, { LightmapReadOnly } from '../core/Lightmap';
 import Spinner from './Spinner';
 import { DebugOverlayRenderer, DebugOverlayWidgets } from './DebugOverlayScene';
 
@@ -30,12 +30,12 @@ export const Main: Story = () => (
     <DebugOverlayRenderer>
       <React.Suspense fallback={<Spinner />}>
         <Lightmap texelsPerUnit={4}>
-          <AutoUV2Ignore>
+          <LightmapReadOnly>
             <mesh position={[0, 0, -2]} receiveShadow>
               <planeBufferGeometry attach="geometry" args={[20, 20]} />
               <meshLambertMaterial attach="material" color="#ffffff" />
             </mesh>
-          </AutoUV2Ignore>
+          </LightmapReadOnly>
 
           <mesh position={[0, 0, 0]} castShadow receiveShadow>
             <circleBufferGeometry attach="geometry" args={[2, 4]} />

@@ -5,7 +5,7 @@ import { OrbitControls } from '@react-three/drei';
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader';
 
-import Lightmap, { AutoUV2Ignore } from '../core/Lightmap';
+import Lightmap, { LightmapReadOnly } from '../core/Lightmap';
 import Spinner from './Spinner';
 import { DebugOverlayRenderer, DebugOverlayWidgets } from './DebugOverlayScene';
 
@@ -72,18 +72,20 @@ const MainSceneContents: React.FC = () => {
   }
 
   return (
-    <AutoUV2Ignore>
-      <mesh position={[0, 0, -5]}>
-        <planeBufferGeometry attach="geometry" args={[200, 200]} />
-        <meshBasicMaterial attach="material" color="#171717" />
-      </mesh>
+    <>
+      <LightmapReadOnly>
+        <mesh position={[0, 0, -5]}>
+          <planeBufferGeometry attach="geometry" args={[200, 200]} />
+          <meshBasicMaterial attach="material" color="#171717" />
+        </mesh>
+
+        <primitive object={coverMesh} dispose={null} />
+      </LightmapReadOnly>
 
       <primitive object={light} dispose={null} />
       <primitive object={light.target} dispose={null} />
 
       <primitive object={baseMesh} dispose={null} />
-
-      <primitive object={coverMesh} dispose={null} />
 
       <spotLight
         position={[0, 0, 2]}
@@ -92,7 +94,7 @@ const MainSceneContents: React.FC = () => {
         penumbra={0.25}
         intensity={0.5}
       />
-    </AutoUV2Ignore>
+    </>
   );
 };
 

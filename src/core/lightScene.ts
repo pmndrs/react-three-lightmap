@@ -1,5 +1,9 @@
 import * as THREE from 'three';
-import { Workbench, traverseSceneItems } from './workbench';
+import {
+  Workbench,
+  traverseSceneItems,
+  traversalStateIsReadOnly
+} from './workbench';
 
 type SupportedMaterial =
   | THREE.MeshLambertMaterial
@@ -66,10 +70,6 @@ export async function withLightScene(
 
     const mesh = object;
 
-    // check if this is a buffer geometry with defined UV2 coordinates
-    const buffer = mesh.geometry;
-    const uv2 = buffer instanceof THREE.BufferGeometry && buffer.attributes.uv2;
-
     // for items with regular materials, temporarily replace the material with our
     // special "staging" material to be able to sub-in intermediate lightmap
     // texture during bounce passes
@@ -120,9 +120,8 @@ export async function withLightScene(
       stagingMaterial.visible = material.visible;
 
       // in non-AO mode, also transfer pigmentation/emissive/other settings
+      // (see below for AO/lightmap itself)
       if (!aoMode) {
-        stagingMaterial.aoMap = material.aoMap;
-        stagingMaterial.aoMapIntensity = material.aoMapIntensity;
         stagingMaterial.color = material.color;
         stagingMaterial.emissive = material.emissive;
         stagingMaterial.emissiveIntensity =
@@ -137,8 +136,22 @@ export async function withLightScene(
       stagingMaterial.shininess = 0; // always fully diffuse
       stagingMaterial.toneMapped = false; // must output in raw linear space
 
-      // mode-specific texture setup
-      if (uv2) {
+      // deal with AO/lightmap
+      if (traversalStateIsReadOnly) {
+        // for read-only objects copy over pre-existing AO map
+        stagingMaterial.aoMap = material.aoMap;
+        stagingMaterial.aoMapIntensity = material.aoMapIntensity;
+
+        // read-only objects might have their own lightmap, so we transfer that too
+        // still also applying bounce multiplier for more light transmission
+        // (but in AO mode ignore any lightmaps anyway)
+        if (!aoMode) {
+          stagingMaterial.lightMap = material.lightMap;
+          stagingMaterial.lightMapIntensity =
+            material.lightMapIntensity * bounceMultiplier;
+        }
+      } else {
+        // set up our writable AO or lightmap as needed
         if (aoMode) {
           // @todo also respect bounce multiplier here (apply as inverse to AO intensity?)
           stagingMaterial.aoMap = irradiance; // use the AO texture
@@ -149,6 +162,10 @@ export async function withLightScene(
 
           stagingMaterial.lightMap = irradiance; // use the lightmap texture
           material.lightMap = irradiance; // set it on original material too
+
+          // also copy over any existing AO map
+          stagingMaterial.aoMap = material.aoMap;
+          stagingMaterial.aoMapIntensity = material.aoMapIntensity;
         }
       }
 

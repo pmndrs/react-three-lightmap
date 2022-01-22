@@ -11,20 +11,20 @@ import {
   initializeWorkbench,
   Workbench,
   WorkbenchSettings,
-  LIGHTMAP_UNMAPPED_FLAG,
+  LIGHTMAP_READONLY_FLAG,
   LIGHTMAP_IGNORE_FLAG
 } from './workbench';
 import { runBakingPasses } from './bake';
 import WorkManager, { useWorkRequest } from './WorkManager';
 
-// prevent automatic generation of UV2 coordinates for content
+// prevent lightmap and UV2 generation for content
 // (but still allow contribution to lightmap, for e.g. emissive objects, large occluders, etc)
-export const AutoUV2Ignore: React.FC = ({ children }) => {
+export const LightmapReadOnly: React.FC = ({ children }) => {
   return (
     <group
-      name="Auto-UV2 opt-out wrapper"
+      name="Lightmap read-only wrapper"
       userData={{
-        [LIGHTMAP_UNMAPPED_FLAG]: true
+        [LIGHTMAP_READONLY_FLAG]: true
       }}
     >
       {children}

@@ -146,16 +146,17 @@ function getInputItems(sceneItems: Generator<THREE.Object3D, void, unknown>) {
       continue;
     }
 
-    // ignore anything that is not a buffer geometry with defined UV2 coordinates
+    // ignore anything that is not a buffer geometry
     // @todo warn on legacy geometry objects if they seem to have UV2?
     const buffer = mesh.geometry;
     if (!(buffer instanceof THREE.BufferGeometry)) {
       continue;
     }
 
+    // if we see this object, it is not read-only and hence must have UV2
     const uv2Attr = buffer.attributes.uv2;
     if (!uv2Attr) {
-      continue;
+      throw new Error('expecting UV2 coordinates on writable lightmapped mesh');
     }
 
     // gather other necessary attributes and ensure compatible data

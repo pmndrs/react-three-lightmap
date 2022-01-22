@@ -4,7 +4,7 @@ import { Canvas, useLoader } from '@react-three/fiber';
 import { OrbitControls } from '@react-three/drei';
 import * as THREE from 'three';
 
-import Lightmap, { AutoUV2Ignore } from '../core/Lightmap';
+import Lightmap, { LightmapReadOnly } from '../core/Lightmap';
 import Spinner from './Spinner';
 import { DebugOverlayRenderer, DebugOverlayWidgets } from './DebugOverlayScene';
 
@@ -24,7 +24,7 @@ const Scene: React.FC = () => {
 
   return (
     <Lightmap ao texelsPerUnit={4}>
-      <AutoUV2Ignore>
+      <LightmapReadOnly>
         <mesh position={[0, 0, -1]} receiveShadow>
           <planeBufferGeometry attach="geometry" args={[20, 20]} />
           <meshPhongMaterial
@@ -33,7 +33,7 @@ const Scene: React.FC = () => {
             //shininess={0}
           />
         </mesh>
-      </AutoUV2Ignore>
+      </LightmapReadOnly>
 
       <mesh position={[-2.5, 1, 0]} rotation={[Math.PI / 2, 0, 0]} castShadow>
         <textBufferGeometry
