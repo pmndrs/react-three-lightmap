@@ -66,6 +66,10 @@ export async function withLightScene(
 
     const mesh = object;
 
+    // check if this is a buffer geometry with defined UV2 coordinates
+    const buffer = mesh.geometry;
+    const uv2 = buffer instanceof THREE.BufferGeometry && buffer.attributes.uv2;
+
     // for items with regular materials, temporarily replace the material with our
     // special "staging" material to be able to sub-in intermediate lightmap
     // texture during bounce passes
@@ -134,17 +138,18 @@ export async function withLightScene(
       stagingMaterial.toneMapped = false; // must output in raw linear space
 
       // mode-specific texture setup
-      // @todo skip this if there is no uv2
-      if (aoMode) {
-        // @todo also respect bounce multiplier here (apply as inverse to AO intensity?)
-        stagingMaterial.aoMap = irradiance; // use the AO texture
-        material.aoMap = irradiance; // set it on original material too
-      } else {
-        // simply increase lightmap intensity for more bounce
-        stagingMaterial.lightMapIntensity = bounceMultiplier;
+      if (uv2) {
+        if (aoMode) {
+          // @todo also respect bounce multiplier here (apply as inverse to AO intensity?)
+          stagingMaterial.aoMap = irradiance; // use the AO texture
+          material.aoMap = irradiance; // set it on original material too
+        } else {
+          // simply increase lightmap intensity for more bounce
+          stagingMaterial.lightMapIntensity = bounceMultiplier;
 
-        stagingMaterial.lightMap = irradiance; // use the lightmap texture
-        material.lightMap = irradiance; // set it on original material too
+          stagingMaterial.lightMap = irradiance; // use the lightmap texture
+          material.lightMap = irradiance; // set it on original material too
+        }
       }
 
       return stagingMaterial;

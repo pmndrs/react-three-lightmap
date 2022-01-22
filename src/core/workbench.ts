@@ -40,6 +40,9 @@ export function objectHasFlag(object: THREE.Object3D, flag: symbol) {
 }
 
 // based on traverse() in https://github.com/mrdoob/three.js/blob/dev/src/core/Object3D.js
+// @todo in theory, there could be a need for flagging objects that have UV2 and should be
+// in light scene, but ignored in atlas and have their own lightmap
+// (really, the "unmapped" flag is not needed, and should instead be "read-only")
 export function* traverseSceneItems(
   root: THREE.Object3D,
   ignoreUnmapped?: boolean,
