@@ -62,10 +62,10 @@ const DUMMY_REJECTOR = (_error: unknown) => {};
 // this simply acts as a central spot to schedule per-frame work
 // (allowing eventual possibility of e.g. multiple unrelated bakers co-existing within a single central work manager)
 // @todo use parent context if available
-const WorkManager: React.FC<{ workPerFrame?: number }> = ({
-  workPerFrame,
-  children
-}) => {
+const WorkManager: React.FC<{
+  workPerFrame?: number;
+  children: React.ReactNode;
+}> = ({ workPerFrame, children }) => {
   const { gl } = useThree(); // @todo use state selector
 
   const workPerFrameReal = Math.max(1, workPerFrame || DEFAULT_WORK_PER_FRAME);

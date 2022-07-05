@@ -19,7 +19,9 @@ import WorkManager, { useWorkRequest } from './WorkManager';
 
 // prevent lightmap and UV2 generation for content
 // (but still allow contribution to lightmap, for e.g. emissive objects, large occluders, etc)
-export const LightmapReadOnly: React.FC = ({ children }) => {
+export const LightmapReadOnly: React.FC<{ children: React.ReactNode }> = ({
+  children
+}) => {
   return (
     <group
       name="Lightmap read-only wrapper"
@@ -34,7 +36,9 @@ export const LightmapReadOnly: React.FC = ({ children }) => {
 
 // prevent wrapped content from affecting the lightmap
 // (hide during baking so that this content does not contribute to irradiance)
-export const LightmapIgnore: React.FC = ({ children }) => {
+export const LightmapIgnore: React.FC<{ children: React.ReactNode }> = ({
+  children
+}) => {
   return (
     <group
       name="Lightmap opt-out wrapper"
