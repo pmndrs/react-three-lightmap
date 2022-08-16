@@ -70,10 +70,6 @@ async function runWorkflow(
   });
 }
 
-const Suspender: React.FC<{ promise: Promise<void> }> = ({ promise }) => {
-  throw promise;
-};
-
 const LightmapMain: React.FC<
   WorkbenchSettings & {
     disabled?: boolean;
@@ -154,13 +150,7 @@ const LightmapMain: React.FC<
   );
 
   return (
-    <DebugContext.Provider value={debugInfo}>
-      {progress && !progress.isComplete ? (
-        <Suspender promise={progress.promise} />
-      ) : null}
-
-      {content}
-    </DebugContext.Provider>
+    <DebugContext.Provider value={debugInfo}>{content}</DebugContext.Provider>
   );
 };
 
