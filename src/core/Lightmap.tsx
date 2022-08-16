@@ -74,40 +74,14 @@ const Suspender: React.FC<{ promise: Promise<void> }> = ({ promise }) => {
   throw promise;
 };
 
-// simply expose a promise that completes when this element is unmounted
-const LegacySuspenseFallbackIntercept: React.FC<{
-  onStarted: (promise: Promise<void>) => void;
-}> = ({ onStarted }) => {
-  const onStartedRef = useRef(onStarted);
-  onStartedRef.current = onStarted;
-
-  useLayoutEffect(() => {
-    let onFinished = () => {};
-    const unmountPromise = new Promise<void>((resolve) => {
-      onFinished = resolve;
-    });
-
-    onStartedRef.current(unmountPromise);
-
-    return () => {
-      onFinished();
-    };
-  }, []);
-
-  // parent will re-suspend with own long-running promise
-  return null;
-};
-
 const LightmapMain: React.FC<
   WorkbenchSettings & {
     disabled?: boolean;
-    legacySuspense?: boolean;
     children: React.ReactElement;
   }
 > = (props) => {
   // read once
   const propsRef = useRef(props);
-  const isLegacyRef = useRef(!!props.legacySuspense);
 
   const requestWork = useWorkRequest();
 
@@ -124,7 +98,6 @@ const LightmapMain: React.FC<
     isComplete: boolean;
   } | null>(null);
 
-  const legacySuspenseWaitPromiseRef = useRef<Promise<void> | null>(null);
   const sceneRef = useRef<unknown>();
   useLayoutEffect(() => {
     // ignore if nothing to do yet
@@ -133,8 +106,7 @@ const LightmapMain: React.FC<
     }
 
     // await until wrapped scene is loaded, if suspense was triggered
-    const sceneReadyPromise =
-      legacySuspenseWaitPromiseRef.current || Promise.resolve();
+    const sceneReadyPromise = Promise.resolve();
 
     const promise = sceneReadyPromise
       .then(() => {
@@ -187,23 +159,7 @@ const LightmapMain: React.FC<
         <Suspender promise={progress.promise} />
       ) : null}
 
-      {isLegacyRef.current ? (
-        // in legacy suspense mode, our effect runs before content may load
-        // so we use a special "detector"  to see when the content suspense is complete
-        <React.Suspense
-          fallback={
-            <LegacySuspenseFallbackIntercept
-              onStarted={(promise) => {
-                legacySuspenseWaitPromiseRef.current = promise;
-              }}
-            />
-          }
-        >
-          {content}
-        </React.Suspense>
-      ) : (
-        content
-      )}
+      {content}
     </DebugContext.Provider>
   );
 };
@@ -211,7 +167,6 @@ const LightmapMain: React.FC<
 // set "legacySuspense" to correctly wait for content load in legacy Suspense mode
 export type LightmapProps = WorkbenchSettings & {
   disabled?: boolean;
-  legacySuspense?: boolean;
   workPerFrame?: number; // @todo allow fractions, dynamic value
 };
 
