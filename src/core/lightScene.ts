@@ -102,6 +102,7 @@ export async function withLightScene(
 
       // clone sensible presentation properties
       const stagingMaterial = new THREE.MeshPhongMaterial();
+      stagingMaterial.name = 'Staging material';
       stagingMaterial.alphaMap = material.alphaMap;
       stagingMaterial.alphaTest = material.alphaTest;
       if (!(material instanceof THREE.MeshLambertMaterial)) {
@@ -155,13 +156,13 @@ export async function withLightScene(
         if (aoMode) {
           // @todo also respect bounce multiplier here (apply as inverse to AO intensity?)
           stagingMaterial.aoMap = irradiance; // use the AO texture
-          material.aoMap = irradiance; // set it on original material too
+          material.aoMap = irradiance; // set it on original material too TODO this after success only
         } else {
           // simply increase lightmap intensity for more bounce
           stagingMaterial.lightMapIntensity = bounceMultiplier;
 
           stagingMaterial.lightMap = irradiance; // use the lightmap texture
-          material.lightMap = irradiance; // set it on original material too
+          material.lightMap = irradiance; // set it on original material too TODO this after success only
 
           // also copy over any existing AO map
           stagingMaterial.aoMap = material.aoMap;

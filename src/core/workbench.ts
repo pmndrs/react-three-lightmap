@@ -182,6 +182,8 @@ export async function initializeWorkbench(
     textureFilter || THREE.LinearFilter
   );
 
+  irradiance.name = 'Rendered irradiance map';
+
   // perform atlas mapping
   const gl = await requestWork();
   const atlasMap = renderAtlas(
