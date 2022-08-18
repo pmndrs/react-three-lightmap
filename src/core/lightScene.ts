@@ -102,6 +102,7 @@ export async function withLightScene(
 
       // clone sensible presentation properties
       const stagingMaterial = new THREE.MeshPhongMaterial();
+      stagingMaterial.name = 'Staging material';
       stagingMaterial.alphaMap = material.alphaMap;
       stagingMaterial.alphaTest = material.alphaTest;
       if (!(material instanceof THREE.MeshLambertMaterial)) {
@@ -155,13 +156,12 @@ export async function withLightScene(
         if (aoMode) {
           // @todo also respect bounce multiplier here (apply as inverse to AO intensity?)
           stagingMaterial.aoMap = irradiance; // use the AO texture
-          material.aoMap = irradiance; // set it on original material too
         } else {
+          // use the lightmap texture
+          stagingMaterial.lightMap = irradiance;
+
           // simply increase lightmap intensity for more bounce
           stagingMaterial.lightMapIntensity = bounceMultiplier;
-
-          stagingMaterial.lightMap = irradiance; // use the lightmap texture
-          material.lightMap = irradiance; // set it on original material too
 
           // also copy over any existing AO map
           stagingMaterial.aoMap = material.aoMap;
@@ -198,8 +198,10 @@ export async function withLightScene(
   }
 
   // perform main task and then clean up regardless of error state
+  let finishedTask = false;
   try {
     await taskCallback();
+    finishedTask = true;
   } finally {
     // remove the staging ambient light
     if (aoSceneLight) {
@@ -228,6 +230,30 @@ export async function withLightScene(
 
       // restore original setting
       mesh.material = origMaterialValue;
+
+      // fill in the computed maps if task was successful
+      if (finishedTask) {
+        const materialList: (THREE.Material | null)[] = Array.isArray(
+          origMaterialValue
+        )
+          ? origMaterialValue
+          : [origMaterialValue];
+
+        materialList.forEach((material) => {
+          if (!material || !materialIsSupported(material)) {
+            return;
+          }
+
+          // set up our AO or lightmap as needed
+          if (aoMode) {
+            material.aoMap = irradiance;
+            material.needsUpdate = true;
+          } else {
+            material.lightMap = irradiance;
+            material.needsUpdate = true;
+          }
+        });
+      }
     });
   }
 }

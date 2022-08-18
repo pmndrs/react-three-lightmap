@@ -32,7 +32,7 @@ export const Main: Story = () => (
         <Lightmap texelsPerUnit={3} workPerFrame={4}>
           <mesh position={[0, 0, -2]} receiveShadow>
             <planeBufferGeometry attach="geometry" args={[4, 4]} />
-            <meshLambertMaterial attach="material" color="#f0f0f0" />
+            <meshLambertMaterial color="#f0f0f0" />
           </mesh>
 
           <mesh
@@ -41,23 +41,23 @@ export const Main: Story = () => (
             receiveShadow
           >
             <planeBufferGeometry attach="geometry" args={[4, 4]} />
-            <meshLambertMaterial attach="material" color="#f0f0f0" />
+            <meshLambertMaterial color="#f0f0f0" />
           </mesh>
 
           <mesh position={[0, 0, 0]} castShadow receiveShadow>
             <boxBufferGeometry attach="geometry" args={[1, 1, 1]} />
 
             <meshLambertMaterial
-              attachArray="material"
+              attach="material-0"
               color="#f0f0f0"
               emissiveIntensity={2}
               emissive={new THREE.Color('#ffffff')}
             />
-            <meshLambertMaterial attachArray="material" color="#ff0000" />
-            <meshLambertMaterial attachArray="material" color="#00ff00" />
-            <meshLambertMaterial attachArray="material" color="#0000ff" />
-            <meshLambertMaterial attachArray="material" color="#ff00ff" />
-            <meshLambertMaterial attachArray="material" color="#ffff00" />
+            <meshLambertMaterial attach="material-1" color="#ff0000" />
+            <meshLambertMaterial attach="material-2" color="#00ff00" />
+            <meshLambertMaterial attach="material-3" color="#0000ff" />
+            <meshLambertMaterial attach="material-4" color="#ff00ff" />
+            <meshLambertMaterial attach="material-5" color="#ffff00" />
           </mesh>
 
           <DebugOverlayWidgets />

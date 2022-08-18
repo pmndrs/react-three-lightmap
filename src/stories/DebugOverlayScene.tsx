@@ -7,9 +7,11 @@ import { DebugContext } from '../core/Lightmap';
 const DebugOverlayContext = React.createContext<THREE.Scene | null>(null);
 
 // set up a special render loop with a debug overlay for various widgets (see below)
-export const DebugOverlayRenderer: React.FC = ({ children }) => {
-  const mainSceneRef = useRef<THREE.Scene>();
-  const debugSceneRef = useRef<THREE.Scene>();
+export const DebugOverlayRenderer: React.FC<{ children: React.ReactNode }> = ({
+  children
+}) => {
+  const mainSceneRef = useRef<THREE.Scene>(null);
+  const debugSceneRef = useRef<THREE.Scene>(null);
 
   const { size } = useThree();
   const debugCamera = useMemo(() => {
