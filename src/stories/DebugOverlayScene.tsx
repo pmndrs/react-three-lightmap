@@ -10,8 +10,8 @@ const DebugOverlayContext = React.createContext<THREE.Scene | null>(null);
 export const DebugOverlayRenderer: React.FC<{ children: React.ReactNode }> = ({
   children
 }) => {
-  const mainSceneRef = useRef<THREE.Scene>();
-  const debugSceneRef = useRef<THREE.Scene>();
+  const mainSceneRef = useRef<THREE.Scene>(null);
+  const debugSceneRef = useRef<THREE.Scene>(null);
 
   const { size } = useThree();
   const debugCamera = useMemo(() => {
