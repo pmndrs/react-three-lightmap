@@ -247,8 +247,10 @@ export async function withLightScene(
           // set up our AO or lightmap as needed
           if (aoMode) {
             material.aoMap = irradiance;
+            material.needsUpdate = true;
           } else {
             material.lightMap = irradiance;
+            material.needsUpdate = true;
           }
         });
       }
