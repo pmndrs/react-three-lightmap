@@ -24,6 +24,8 @@ Example:
 
 NOTE: if you are using `mode="legacy"` on your `<Canvas>` tag please add `legacySuspense` flag to the lightmap, otherwise it will not wait until your scene content is fully loaded. This is not an issue in most situations, unless you have explicitly set the mode prop on `<Canvas>`.
 
+To track when baking is complete, provide `onComplete` callback to `Lightmap` - it will be called with the resulting texture as the first argument. The library does automatically assign that texture as the lightmap on all the baked mesh materials too.
+
 ## Local Development
 
 ```sh
@@ -35,7 +37,7 @@ yarn storybook
 
 ## Wishlist
 
-- onComplete callback
+- ~~onComplete callback~~
 - proper denoising, calibrate the light sampler
 - much more optimization
 - composited multi-layer lightmap based on several distinct groups of light sources
