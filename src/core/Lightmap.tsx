@@ -68,11 +68,14 @@ async function runWorkflow(
   await withLightScene(workbench, async () => {
     await runBakingPasses(workbench, requestWork);
   });
+
+  return workbench.irradiance;
 }
 
 const LightmapMain: React.FC<
   WorkbenchSettings & {
     disabled?: boolean;
+    onComplete?: (result: THREE.Texture) => void;
     children: React.ReactElement;
   }
 > = (props) => {
@@ -86,13 +89,18 @@ const LightmapMain: React.FC<
   enabledRef.current = enabledRef.current || !props.disabled;
   const allowStart = enabledRef.current;
 
+  // track latest reference to onComplete callback
+  const onCompleteRef = useRef(props.onComplete);
+  onCompleteRef.current = props.onComplete;
+  useLayoutEffect(() => {
+    return () => {
+      // if we unmount early, prevent our async workflow from calling a stale callback
+      onCompleteRef.current = undefined;
+    };
+  }, []);
+
   // debug reference to workbench for intermediate display
   const [workbench, setWorkbench] = useState<Workbench | null>(null);
-
-  const [progress, setProgress] = useState<{
-    promise: Promise<void>;
-    isComplete: boolean;
-  } | null>(null);
 
   const sceneRef = useRef<unknown>();
   useLayoutEffect(() => {
@@ -101,10 +109,9 @@ const LightmapMain: React.FC<
       return;
     }
 
-    // await until wrapped scene is loaded, if suspense was triggered
-    const sceneReadyPromise = Promise.resolve();
-
-    const promise = sceneReadyPromise
+    // kick off the asynchronous workflow process
+    // (this runs when scene content is loaded and suspensions are finished)
+    Promise.resolve()
       .then(() => {
         const scene = sceneRef.current;
         if (!scene || !(scene instanceof THREE.Scene)) {
@@ -122,12 +129,11 @@ const LightmapMain: React.FC<
           }
         );
       })
-      .then(() => {
-        // @todo how well does this work while we are suspended?
-        setProgress({ promise, isComplete: true });
+      .then((result) => {
+        if (onCompleteRef.current) {
+          onCompleteRef.current(result);
+        }
       });
-
-    setProgress({ promise, isComplete: false });
   }, [allowStart, requestWork]);
 
   const debugInfo = useMemo(
@@ -154,10 +160,10 @@ const LightmapMain: React.FC<
   );
 };
 
-// set "legacySuspense" to correctly wait for content load in legacy Suspense mode
 export type LightmapProps = WorkbenchSettings & {
   disabled?: boolean;
   workPerFrame?: number; // @todo allow fractions, dynamic value
+  onComplete?: (result: THREE.Texture) => void;
 };
 
 const Lightmap = React.forwardRef<
