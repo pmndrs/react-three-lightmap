@@ -109,13 +109,13 @@ async function runWorkflow(
     await runBakingPasses(workbench, requestWork);
   });
 
-  return workbench.irradiance;
+  return workbench;
 }
 
 const LightmapMain: React.FC<
   WorkbenchSettings & {
     disabled?: boolean;
-    onComplete?: (result: THREE.Texture) => void;
+    onComplete?: (result: Workbench) => void;
     children: React.ReactElement;
   }
 > = (props) => {
@@ -200,11 +200,12 @@ const LightmapMain: React.FC<
   );
 };
 
-const WorkRoot: React.FC<React.PropsWithChildren<LightmapProps>> = ({
-  workPerFrame,
-  children,
-  ...props
-}) => {
+const WorkRoot: React.FC<
+  React.PropsWithChildren<{
+    workPerFrame?: number; // @todo allow fractions, dynamic value
+    onComplete?: (result: Workbench) => void;
+  }>
+> = ({ workPerFrame, children, ...props }) => {
   return (
     <WorkManager workPerFrame={workPerFrame}>
       <LightmapMain {...props}>
@@ -218,6 +219,28 @@ const WorkRoot: React.FC<React.PropsWithChildren<LightmapProps>> = ({
 type OffscreenSettings = WorkbenchSettings & {
   workPerFrame?: number; // @todo allow fractions, dynamic value
 };
+
+function createLightmapTexture(
+  data: Float32Array,
+  width: number,
+  height: number,
+  textureFilter: THREE.TextureFilter
+): THREE.Texture {
+  const texture = new THREE.DataTexture(
+    data,
+    width,
+    height,
+    THREE.RGBAFormat,
+    THREE.FloatType
+  );
+
+  // set same texture filter (no mipmaps supported due to the nature of lightmaps)
+  texture.magFilter = textureFilter;
+  texture.minFilter = textureFilter;
+  texture.generateMipmaps = false;
+
+  return texture;
+}
 
 async function runOffscreenWorkflow(
   scene: React.ReactNode,
@@ -240,7 +263,15 @@ async function runOffscreenWorkflow(
       <WorkRoot
         {...settings}
         onComplete={(output) => {
-          resolve(output); // @todo copy texture data since this is a foreign canvas
+          resolve(
+            // copy texture data since this is a foreign canvas
+            createLightmapTexture(
+              output.irradianceData,
+              output.irradianceWidth,
+              output.irradianceHeight,
+              output.irradiance.magFilter
+            )
+          );
         }}
       >
         {scene}

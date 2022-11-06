@@ -16,6 +16,8 @@ export interface Workbench {
   // lightmap output
   irradiance: THREE.Texture;
   irradianceData: Float32Array;
+  irradianceWidth: number;
+  irradianceHeight: number;
 
   // sampler settings
   settings: LightProbeSettings;
@@ -208,6 +210,8 @@ export async function initializeWorkbench(
 
     irradiance,
     irradianceData,
+    irradianceWidth: lightMapWidth,
+    irradianceHeight: lightMapHeight,
 
     settings: settings
   };
