@@ -58,11 +58,13 @@ export const DebugContext = React.createContext<{
 } | null>(null);
 
 // set the computed irradiance texture on real scene materials
-export async function updateFinalSceneMaterials(workbench: Workbench) {
-  const { aoMode, lightScene, irradiance } = workbench;
-
+function updateFinalSceneMaterials(
+  scene: THREE.Scene,
+  irradiance: THREE.Texture,
+  aoMode: boolean
+) {
   // process relevant meshes
-  for (const object of traverseSceneItems(lightScene, false)) {
+  for (const object of traverseSceneItems(scene, false)) {
     // simple check for type (no need to check for uv2 presence)
     if (!(object instanceof THREE.Mesh)) {
       continue;
@@ -91,6 +93,7 @@ export async function updateFinalSceneMaterials(workbench: Workbench) {
     });
   }
 }
+
 // main asynchronous workflow sequence
 async function runWorkflow(
   scene: THREE.Scene,
@@ -105,7 +108,11 @@ async function runWorkflow(
     await runBakingPasses(workbench, requestWork);
   });
 
-  await updateFinalSceneMaterials(workbench);
+  updateFinalSceneMaterials(
+    workbench.lightScene,
+    workbench.irradiance,
+    workbench.aoMode
+  );
 
   return workbench.irradiance;
 }
