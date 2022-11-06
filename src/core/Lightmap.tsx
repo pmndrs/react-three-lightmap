@@ -6,9 +6,10 @@
 import React, { useState, useMemo, useLayoutEffect, useRef } from 'react';
 import * as THREE from 'three';
 
-import { withLightScene } from './lightScene';
+import { withLightScene, materialIsSupported } from './lightScene';
 import {
   initializeWorkbench,
+  traverseSceneItems,
   Workbench,
   WorkbenchSettings,
   LIGHTMAP_READONLY_FLAG,
@@ -56,6 +57,40 @@ export const DebugContext = React.createContext<{
   outputTexture: THREE.Texture;
 } | null>(null);
 
+// set the computed irradiance texture on real scene materials
+export async function updateFinalSceneMaterials(workbench: Workbench) {
+  const { aoMode, lightScene, irradiance } = workbench;
+
+  // process relevant meshes
+  for (const object of traverseSceneItems(lightScene, false)) {
+    // simple check for type (no need to check for uv2 presence)
+    if (!(object instanceof THREE.Mesh)) {
+      continue;
+    }
+
+    const mesh = object;
+
+    const materialList: (THREE.Material | null)[] = Array.isArray(mesh.material)
+      ? mesh.material
+      : [mesh.material];
+
+    // fill in the computed maps
+    materialList.forEach((material) => {
+      if (!material || !materialIsSupported(material)) {
+        return;
+      }
+
+      // set up our AO or lightmap as needed
+      if (aoMode) {
+        material.aoMap = irradiance;
+        material.needsUpdate = true;
+      } else {
+        material.lightMap = irradiance;
+        material.needsUpdate = true;
+      }
+    });
+  }
+}
 // main asynchronous workflow sequence
 async function runWorkflow(
   scene: THREE.Scene,
@@ -69,6 +104,8 @@ async function runWorkflow(
   await withLightScene(workbench, async () => {
     await runBakingPasses(workbench, requestWork);
   });
+
+  await updateFinalSceneMaterials(workbench);
 
   return workbench.irradiance;
 }
