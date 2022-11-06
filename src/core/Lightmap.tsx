@@ -4,6 +4,7 @@
  */
 
 import React, { useState, useMemo, useLayoutEffect, useRef } from 'react';
+import { createRoot } from '@react-three/fiber';
 import * as THREE from 'three';
 
 import { withLightScene, materialIsSupported } from './lightScene';
@@ -108,12 +109,6 @@ async function runWorkflow(
     await runBakingPasses(workbench, requestWork);
   });
 
-  updateFinalSceneMaterials(
-    workbench.lightScene,
-    workbench.irradiance,
-    workbench.aoMode
-  );
-
   return workbench.irradiance;
 }
 
@@ -205,13 +200,7 @@ const LightmapMain: React.FC<
   );
 };
 
-export type LightmapProps = WorkbenchSettings & {
-  disabled?: boolean;
-  workPerFrame?: number; // @todo allow fractions, dynamic value
-  onComplete?: (result: THREE.Texture) => void;
-};
-
-const Lightmap: React.FC<React.PropsWithChildren<LightmapProps>> = ({
+const WorkRoot: React.FC<React.PropsWithChildren<LightmapProps>> = ({
   workPerFrame,
   children,
   ...props
@@ -219,9 +208,89 @@ const Lightmap: React.FC<React.PropsWithChildren<LightmapProps>> = ({
   return (
     <WorkManager workPerFrame={workPerFrame}>
       <LightmapMain {...props}>
-        <scene name="Lightmap Scene">{children}</scene>
+        <scene name="Lightmap Baking Scene">{children}</scene>
       </LightmapMain>
     </WorkManager>
+  );
+};
+
+// @todo deal with disabled flag
+type OffscreenSettings = WorkbenchSettings & {
+  workPerFrame?: number; // @todo allow fractions, dynamic value
+};
+
+async function runOffscreenWorkflow(
+  scene: React.ReactNode,
+  settings: OffscreenSettings
+) {
+  // @todo remove  await new Promise((resolve) => setTimeout(resolve, 100));
+
+  return new Promise<THREE.Texture>((resolve) => {
+    // just sensible small canvas, not actually used for direct output
+    const canvas = document.createElement('canvas');
+    canvas.width = 64;
+    canvas.height = 64;
+
+    const root = createRoot(canvas).configure({
+      // frameloop: 'demand', @todo manually control the render loop
+      shadows: true // @todo use the original GL context settings
+    });
+
+    root.render(
+      <WorkRoot
+        {...settings}
+        onComplete={(output) => {
+          resolve(output); // @todo copy texture data since this is a foreign canvas
+        }}
+      >
+        {scene}
+      </WorkRoot>
+    );
+  });
+}
+
+export type LightmapProps = WorkbenchSettings & {
+  disabled?: boolean;
+  workPerFrame?: number; // @todo allow fractions, dynamic value
+  onComplete?: (result: THREE.Texture) => void;
+};
+
+const Lightmap: React.FC<React.PropsWithChildren<LightmapProps>> = ({
+  onComplete,
+  ...props
+}) => {
+  const initialPropsRef = useRef(props);
+
+  const [result, setResult] = useState<THREE.Texture | null>(null);
+
+  useLayoutEffect(() => {
+    // @todo clean up when unmounting early
+    const { children, ...settings } = initialPropsRef.current;
+    const workflowResult = runOffscreenWorkflow(children, settings);
+
+    workflowResult.then((texture) => {
+      setResult(texture);
+    });
+  }, []);
+
+  const sceneRef = useRef<THREE.Scene>(null);
+
+  useLayoutEffect(() => {
+    if (!result || !sceneRef.current) {
+      return;
+    }
+
+    updateFinalSceneMaterials(
+      sceneRef.current,
+      result,
+      !!initialPropsRef.current.ao
+    );
+  }, [result]);
+
+  return (
+    <scene name="Lightmap Result Scene" ref={sceneRef}>
+      {props.children}
+    </scene>
   );
 };
 
