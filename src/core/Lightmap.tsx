@@ -113,7 +113,6 @@ async function runWorkflow(
   return workbench;
 }
 
-// @todo merge with WorkRoot
 const LightmapMain: React.FC<
   WorkbenchSettings & {
     workPerFrame?: number; // @todo allow fractions, dynamic value
@@ -222,7 +221,7 @@ async function runOffscreenWorkflow(
     canvas.height = 64;
 
     const root = createRoot(canvas).configure({
-      // frameloop: 'demand', @todo manually control the render loop
+      frameloop: 'never', // framebuffer target rendering is inside own RAF loop
       shadows: true // @todo use the original GL context settings
     });
 
