@@ -18,7 +18,7 @@ import {
 } from './workbench';
 import { runBakingPasses } from './bake';
 import { computeAutoUV2Layout } from './AutoUV2';
-import WorkManager, { useWorkRequest } from './WorkManager';
+import { useWorkManager } from './WorkManager';
 
 // prevent lightmap and UV2 generation for content
 // (but still allow contribution to lightmap, for e.g. emissive objects, large occluders, etc)
@@ -113,17 +113,20 @@ async function runWorkflow(
   return workbench;
 }
 
+// @todo merge with WorkRoot
 const LightmapMain: React.FC<
   WorkbenchSettings & {
+    workPerFrame?: number; // @todo allow fractions, dynamic value
     disabled?: boolean;
     onComplete?: (result: Workbench) => void;
-    children: React.ReactElement;
+    children: React.ReactNode;
   }
 > = (props) => {
   // read once
   const initialPropsRef = useRef(props);
 
-  const requestWork = useWorkRequest();
+  // our own work manager
+  const requestWork = useWorkManager(props.workPerFrame);
 
   // disabled prop can start out true and become false, but afterwards we ignore it
   const enabledRef = useRef(!props.disabled);
@@ -143,7 +146,7 @@ const LightmapMain: React.FC<
   // debug reference to workbench for intermediate display
   const [workbench, setWorkbench] = useState<Workbench | null>(null);
 
-  const sceneRef = useRef<unknown>();
+  const sceneRef = useRef<THREE.Scene>();
   useLayoutEffect(() => {
     // ignore if nothing to do yet
     if (!allowStart) {
@@ -155,7 +158,7 @@ const LightmapMain: React.FC<
     Promise.resolve()
       .then(() => {
         const scene = sceneRef.current;
-        if (!scene || !(scene instanceof THREE.Scene)) {
+        if (!scene) {
           throw new Error('expecting lightmap scene');
         }
 
@@ -191,28 +194,13 @@ const LightmapMain: React.FC<
   // wrap scene in an extra group object
   // so that when this is hidden during suspension only the wrapper has visible=false
   const content = (
-    <group name="Lightmap Scene Wrapper">
-      {React.cloneElement(props.children, { ref: sceneRef })}
-    </group>
+    <scene name="Lightmap Baking Scene" ref={sceneRef}>
+      {props.children}
+    </scene>
   );
 
   return (
     <DebugContext.Provider value={debugInfo}>{content}</DebugContext.Provider>
-  );
-};
-
-const WorkRoot: React.FC<
-  React.PropsWithChildren<{
-    workPerFrame?: number; // @todo allow fractions, dynamic value
-    onComplete?: (result: Workbench) => void;
-  }>
-> = ({ workPerFrame, children, ...props }) => {
-  return (
-    <WorkManager workPerFrame={workPerFrame}>
-      <LightmapMain {...props}>
-        <scene name="Lightmap Baking Scene">{children}</scene>
-      </LightmapMain>
-    </WorkManager>
   );
 };
 
@@ -222,7 +210,7 @@ type OffscreenSettings = WorkbenchSettings & {
 };
 
 async function runOffscreenWorkflow(
-  scene: React.ReactNode,
+  content: React.ReactNode,
   settings: OffscreenSettings
 ) {
   // @todo remove  await new Promise((resolve) => setTimeout(resolve, 100));
@@ -239,14 +227,14 @@ async function runOffscreenWorkflow(
     });
 
     root.render(
-      <WorkRoot
+      <LightmapMain
         {...settings}
         onComplete={(output) => {
           resolve(output);
         }}
       >
-        {scene}
-      </WorkRoot>
+        {content}
+      </LightmapMain>
     );
   });
 }

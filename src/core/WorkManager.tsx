@@ -20,52 +20,12 @@ interface WorkTask {
   promise: Promise<unknown> | null;
 }
 
-export function useWorkRequest() {
-  const requester = useContext(WorkManagerContext);
-  if (!requester) {
-    throw new Error('must be inside work manager');
-  }
-
-  // track on-unmount callback
-  const unmountedCbRef = useRef(() => {});
-  useEffect(() => {
-    return () => {
-      unmountedCbRef.current();
-    };
-  }, []);
-
-  // wrap requester with local unmount check as well
-  const wrappedRequester = useMemo(() => {
-    // reject when this is unmounted
-    const whenUnmounted = new Promise<void>((resolve) => {
-      unmountedCbRef.current = resolve;
-    }).then(() => {
-      throw new Error('work requester was unmounted');
-    });
-
-    // silence the rejection in case this is never listened to
-    whenUnmounted.catch(() => {
-      // no-op
-    });
-
-    // combine the normal RAF promise with the unmount rejection
-    return () =>
-      Promise.race<THREE.WebGLRenderer>([whenUnmounted, requester()]);
-  }, [requester]);
-
-  return wrappedRequester;
-}
-
 const DUMMY_RESOLVER = (_gl: THREE.WebGLRenderer) => {};
 const DUMMY_REJECTOR = (_error: unknown) => {};
 
-// this simply acts as a central spot to schedule per-frame work
-// (allowing eventual possibility of e.g. multiple unrelated bakers co-existing within a single central work manager)
-// @todo use parent context if available
-const WorkManager: React.FC<{
-  workPerFrame?: number;
-  children: React.ReactNode;
-}> = ({ workPerFrame, children }) => {
+// simple job queue to schedule per-frame work
+// (with some tricks like randomizing the task pop, etc)
+export function useWorkManager(workPerFrame?: number) {
   const { gl } = useThree(); // @todo use state selector
 
   const workPerFrameReal = Math.max(1, workPerFrame || DEFAULT_WORK_PER_FRAME);
@@ -159,13 +119,5 @@ const WorkManager: React.FC<{
     return promise;
   }, [gl]);
 
-  return (
-    <>
-      <WorkManagerContext.Provider value={requestWork}>
-        {children}
-      </WorkManagerContext.Provider>
-    </>
-  );
-};
-
-export default WorkManager;
+  return requestWork;
+}
