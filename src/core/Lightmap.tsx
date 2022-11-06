@@ -17,6 +17,7 @@ import {
   LIGHTMAP_IGNORE_FLAG
 } from './workbench';
 import { runBakingPasses } from './bake';
+import { computeAutoUV2Layout } from './AutoUV2';
 import WorkManager, { useWorkRequest } from './WorkManager';
 
 // prevent lightmap and UV2 generation for content
@@ -248,7 +249,7 @@ async function runOffscreenWorkflow(
 ) {
   // @todo remove  await new Promise((resolve) => setTimeout(resolve, 100));
 
-  return new Promise<THREE.Texture>((resolve) => {
+  return new Promise<Workbench>((resolve) => {
     // just sensible small canvas, not actually used for direct output
     const canvas = document.createElement('canvas');
     canvas.width = 64;
@@ -263,15 +264,7 @@ async function runOffscreenWorkflow(
       <WorkRoot
         {...settings}
         onComplete={(output) => {
-          resolve(
-            // copy texture data since this is a foreign canvas
-            createLightmapTexture(
-              output.irradianceData,
-              output.irradianceWidth,
-              output.irradianceHeight,
-              output.irradiance.magFilter
-            )
-          );
+          resolve(output);
         }}
       >
         {scene}
@@ -292,15 +285,15 @@ const Lightmap: React.FC<React.PropsWithChildren<LightmapProps>> = ({
 }) => {
   const initialPropsRef = useRef(props);
 
-  const [result, setResult] = useState<THREE.Texture | null>(null);
+  const [result, setResult] = useState<Workbench | null>(null);
 
   useLayoutEffect(() => {
     // @todo clean up when unmounting early
     const { children, ...settings } = initialPropsRef.current;
     const workflowResult = runOffscreenWorkflow(children, settings);
 
-    workflowResult.then((texture) => {
-      setResult(texture);
+    workflowResult.then((result) => {
+      setResult(result);
     });
   }, []);
 
@@ -311,9 +304,27 @@ const Lightmap: React.FC<React.PropsWithChildren<LightmapProps>> = ({
       return;
     }
 
+    // create UV2 coordinates for the final scene meshes
+    // @todo somehow reuse ones from the baker?
+    computeAutoUV2Layout(
+      initialPropsRef.current.lightMapSize,
+      traverseSceneItems(sceneRef.current, true),
+      {
+        texelsPerUnit: result.texelsPerUnit
+      }
+    );
+
+    // copy texture data since this is a foreign canvas
+    const texture = createLightmapTexture(
+      result.irradianceData,
+      result.irradianceWidth,
+      result.irradianceHeight,
+      result.irradiance.magFilter
+    );
+
     updateFinalSceneMaterials(
       sceneRef.current,
-      result,
+      texture,
       !!initialPropsRef.current.ao
     );
   }, [result]);
