@@ -149,11 +149,18 @@ export interface AutoUV2Settings {
 }
 
 export function computeAutoUV2Layout(
-  initialWidth: number | undefined,
-  initialHeight: number | undefined,
+  lightMapSize: number | [number, number] | undefined,
   items: Generator<THREE.Object3D, void, unknown>,
   { texelsPerUnit }: AutoUV2Settings
 ): [number, number] {
+  // parse the convenience setting
+  const [initialWidth, initialHeight] = lightMapSize
+    ? [
+        typeof lightMapSize === 'number' ? lightMapSize : lightMapSize[0],
+        typeof lightMapSize === 'number' ? lightMapSize : lightMapSize[1]
+      ]
+    : [undefined, undefined];
+
   const layoutBoxes: AutoUVBox[] = [];
   let hasPredefinedUV2 = false;
 

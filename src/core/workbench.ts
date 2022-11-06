@@ -9,6 +9,7 @@ export interface Workbench {
   aoDistance: number;
   emissiveMultiplier: number;
   bounceMultiplier: number;
+  texelsPerUnit: number;
 
   lightScene: THREE.Scene;
   atlasMap: AtlasMap;
@@ -150,25 +151,17 @@ export async function initializeWorkbench(
     ...samplerSettings
   };
 
-  // parse the convenience setting
-  const [initialWidth, initialHeight] = lightMapSize
-    ? [
-        typeof lightMapSize === 'number' ? lightMapSize : lightMapSize[0],
-        typeof lightMapSize === 'number' ? lightMapSize : lightMapSize[1]
-      ]
-    : [undefined, undefined];
-
   // wait a bit for responsiveness
   await requestNextTick();
 
   // perform UV auto-layout in next tick
+  const realTexelsPerUnit = texelsPerUnit || DEFAULT_TEXELS_PER_UNIT;
 
   const [computedWidth, computedHeight] = computeAutoUV2Layout(
-    initialWidth,
-    initialHeight,
+    lightMapSize,
     traverseSceneItems(scene, true),
     {
-      texelsPerUnit: texelsPerUnit || DEFAULT_TEXELS_PER_UNIT
+      texelsPerUnit: realTexelsPerUnit
     }
   );
 
@@ -204,6 +197,7 @@ export async function initializeWorkbench(
         ? DEFAULT_EMISSIVE_MULTIPLIER
         : emissiveMultiplier,
     bounceMultiplier: bounceMultiplier === undefined ? 1 : bounceMultiplier,
+    texelsPerUnit: realTexelsPerUnit,
 
     lightScene: scene,
     atlasMap,
