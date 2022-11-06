@@ -4,7 +4,7 @@
  */
 
 import React, { useState, useMemo, useLayoutEffect, useRef } from 'react';
-import { createRoot } from '@react-three/fiber';
+import { useThree, createRoot } from '@react-three/fiber';
 import * as THREE from 'three';
 
 import { withLightScene, materialIsSupported } from './lightScene';
@@ -18,7 +18,7 @@ import {
 } from './workbench';
 import { runBakingPasses } from './bake';
 import { computeAutoUV2Layout } from './AutoUV2';
-import { useWorkManager } from './WorkManager';
+import { createWorkManager } from './WorkManager';
 
 // prevent lightmap and UV2 generation for content
 // (but still allow contribution to lightmap, for e.g. emissive objects, large occluders, etc)
@@ -113,82 +113,31 @@ async function runWorkflow(
   return workbench;
 }
 
-const LightmapMain: React.FC<
-  WorkbenchSettings & {
-    workPerFrame?: number; // @todo allow fractions, dynamic value
-    disabled?: boolean;
-    onComplete?: (result: Workbench) => void;
-    children: React.ReactNode;
-  }
-> = (props) => {
-  // read once
-  const initialPropsRef = useRef(props);
-
-  // our own work manager
-  const requestWork = useWorkManager(props.workPerFrame);
-
-  // disabled prop can start out true and become false, but afterwards we ignore it
-  const enabledRef = useRef(!props.disabled);
-  enabledRef.current = enabledRef.current || !props.disabled;
-  const allowStart = enabledRef.current;
+// @todo disabled prop
+const WorkSceneWrapper: React.FC<{
+  onReady: (gl: THREE.WebGLRenderer, scene: THREE.Scene) => void;
+  children: React.ReactNode;
+}> = (props) => {
+  const { gl } = useThree(); // @todo use state selector
 
   // track latest reference to onComplete callback
-  const onCompleteRef = useRef(props.onComplete);
-  onCompleteRef.current = props.onComplete;
-  useLayoutEffect(() => {
-    return () => {
-      // if we unmount early, prevent our async workflow from calling a stale callback
-      onCompleteRef.current = undefined;
-    };
-  }, []);
-
-  // debug reference to workbench for intermediate display
-  const [workbench, setWorkbench] = useState<Workbench | null>(null);
+  const onReadyRef = useRef(props.onReady);
+  onReadyRef.current = props.onReady;
 
   const sceneRef = useRef<THREE.Scene>();
   useLayoutEffect(() => {
-    // ignore if nothing to do yet
-    if (!allowStart) {
-      return;
+    // kick off the asynchronous workflow process in the parent
+    // (this runs when scene content is loaded and suspensions are finished)
+    const scene = sceneRef.current;
+    if (!scene) {
+      throw new Error('expecting lightmap scene');
     }
 
-    // kick off the asynchronous workflow process
-    // (this runs when scene content is loaded and suspensions are finished)
-    Promise.resolve()
-      .then(() => {
-        const scene = sceneRef.current;
-        if (!scene) {
-          throw new Error('expecting lightmap scene');
-        }
+    onReadyRef.current(gl, scene);
+  }, [gl]);
 
-        // not tracking unmount here because the work manager will bail out anyway when unmounted early
-        // @todo check if this runs multiple times on some React versions???
-        return runWorkflow(
-          scene,
-          initialPropsRef.current,
-          requestWork,
-          (debugWorkbench) => {
-            setWorkbench(debugWorkbench);
-          }
-        );
-      })
-      .then((result) => {
-        if (onCompleteRef.current) {
-          onCompleteRef.current(result);
-        }
-      });
-  }, [allowStart, requestWork]);
-
-  const debugInfo = useMemo(
-    () =>
-      workbench
-        ? {
-            atlasTexture: workbench.atlasMap.texture,
-            outputTexture: workbench.irradiance
-          }
-        : null,
-    [workbench]
-  );
+  // @todo debug reference to workbench for intermediate display
+  const debugInfo = useMemo(() => null, []);
 
   // wrap scene in an extra group object
   // so that when this is hidden during suspension only the wrapper has visible=false
@@ -212,9 +161,11 @@ async function runOffscreenWorkflow(
   content: React.ReactNode,
   settings: OffscreenSettings
 ) {
-  // @todo remove  await new Promise((resolve) => setTimeout(resolve, 100));
-
-  return new Promise<Workbench>((resolve) => {
+  // render hidden canvas with the given content, wait for suspense to finish loading inside it
+  const { gl, scene } = await new Promise<{
+    gl: THREE.WebGLRenderer;
+    scene: THREE.Scene;
+  }>((resolve) => {
     // just sensible small canvas, not actually used for direct output
     const canvas = document.createElement('canvas');
     canvas.width = 64;
@@ -226,15 +177,23 @@ async function runOffscreenWorkflow(
     });
 
     root.render(
-      <LightmapMain
-        {...settings}
-        onComplete={(output) => {
-          resolve(output);
+      <WorkSceneWrapper
+        onReady={(gl, scene) => {
+          resolve({ gl, scene });
         }}
       >
         {content}
-      </LightmapMain>
+      </WorkSceneWrapper>
     );
+  });
+
+  // our own work manager
+  const requestWork = createWorkManager(gl, settings.workPerFrame);
+
+  // not tracking unmount here because the work manager will bail out anyway when unmounted early
+  // @todo check if this runs multiple times on some React versions???
+  return runWorkflow(scene, settings, requestWork, (debugWorkbench) => {
+    // @todo this setWorkbench(debugWorkbench);
   });
 }
 

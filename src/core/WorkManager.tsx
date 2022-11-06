@@ -1,18 +1,6 @@
-import React, {
-  useEffect,
-  useCallback,
-  useMemo,
-  useRef,
-  useContext
-} from 'react';
-import { useThree } from '@react-three/fiber';
-
 const DEFAULT_WORK_PER_FRAME = 2;
 
 export type WorkRequester = () => Promise<THREE.WebGLRenderer>;
-export const WorkManagerContext = React.createContext<WorkRequester | null>(
-  null
-);
 
 interface WorkTask {
   resolve: (gl: THREE.WebGLRenderer) => void;
@@ -25,16 +13,16 @@ const DUMMY_REJECTOR = (_error: unknown) => {};
 
 // simple job queue to schedule per-frame work
 // (with some tricks like randomizing the task pop, etc)
-export function useWorkManager(workPerFrame?: number) {
-  const { gl } = useThree(); // @todo use state selector
-
+export function createWorkManager(
+  gl: THREE.WebGLRenderer,
+  workPerFrame?: number
+): WorkRequester {
   const workPerFrameReal = Math.max(1, workPerFrame || DEFAULT_WORK_PER_FRAME);
-  const workPerFrameRef = useRef(workPerFrameReal);
-  workPerFrameRef.current = workPerFrameReal;
 
-  const rafActiveRef = useRef(false);
-  const pendingTasksRef = useRef<WorkTask[]>([]);
+  let rafActive = false;
+  const pendingTasks: WorkTask[] = [];
 
+  /* @todo cleanup logic
   const unmountedRef = useRef(false);
   useEffect(() => {
     return () => {
@@ -58,32 +46,32 @@ export function useWorkManager(workPerFrame?: number) {
       }
     };
   }, []);
+  */
 
   // awaitable request for next microtask inside RAF
-  const requestWork = useCallback(() => {
+  const requestWork = () => {
     // this helps break out of long-running async jobs
-    if (unmountedRef.current) {
-      throw new Error('work manager is no longer available');
-    }
+    // @todo
+    // if (unmountedRef.current) {
+    //   throw new Error('work manager is no longer available');
+    // }
 
     // schedule next RAF if needed
-    if (!rafActiveRef.current) {
-      rafActiveRef.current = true;
+    if (!rafActive) {
+      rafActive = true;
 
       async function rafRun() {
-        for (let i = 0; i < workPerFrameRef.current; i += 1) {
-          if (pendingTasksRef.current.length === 0) {
+        for (let i = 0; i < workPerFrameReal; i += 1) {
+          if (pendingTasks.length === 0) {
             // break out and stop the RAF loop for now
-            rafActiveRef.current = false;
+            rafActive = false;
             return;
           }
 
           // pick random microtask to run
-          const taskIndex = Math.floor(
-            Math.random() * pendingTasksRef.current.length
-          );
-          const task = pendingTasksRef.current[taskIndex];
-          pendingTasksRef.current.splice(taskIndex, 1);
+          const taskIndex = Math.floor(Math.random() * pendingTasks.length);
+          const task = pendingTasks[taskIndex];
+          pendingTasks.splice(taskIndex, 1);
 
           // notify pending worker
           task.resolve(gl);
@@ -110,14 +98,14 @@ export function useWorkManager(workPerFrame?: number) {
       taskReject = reject;
     });
 
-    pendingTasksRef.current.push({
+    pendingTasks.push({
       resolve: taskResolve,
       reject: taskReject,
       promise: promise
     });
 
     return promise;
-  }, [gl]);
+  };
 
   return requestWork;
 }
