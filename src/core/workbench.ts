@@ -17,8 +17,8 @@ export interface Workbench {
   // lightmap output
   irradiance: THREE.Texture;
   irradianceData: Float32Array;
-  irradianceWidth: number;
-  irradianceHeight: number;
+
+  createOutputTexture: () => THREE.Texture;
 
   // sampler settings
   settings: LightProbeSettings;
@@ -204,8 +204,24 @@ export async function initializeWorkbench(
 
     irradiance,
     irradianceData,
-    irradianceWidth: lightMapWidth,
-    irradianceHeight: lightMapHeight,
+
+    // clone the lightmap/AO map to use in a different GL context
+    createOutputTexture(): THREE.Texture {
+      const texture = new THREE.DataTexture(
+        irradianceData,
+        lightMapWidth,
+        lightMapHeight,
+        THREE.RGBAFormat,
+        THREE.FloatType
+      );
+
+      // set same texture filter (no mipmaps supported due to the nature of lightmaps)
+      texture.magFilter = irradiance.magFilter;
+      texture.minFilter = irradiance.minFilter;
+      texture.generateMipmaps = false;
+
+      return texture;
+    },
 
     settings: settings
   };

@@ -221,28 +221,6 @@ type OffscreenSettings = WorkbenchSettings & {
   workPerFrame?: number; // @todo allow fractions, dynamic value
 };
 
-function createLightmapTexture(
-  data: Float32Array,
-  width: number,
-  height: number,
-  textureFilter: THREE.TextureFilter
-): THREE.Texture {
-  const texture = new THREE.DataTexture(
-    data,
-    width,
-    height,
-    THREE.RGBAFormat,
-    THREE.FloatType
-  );
-
-  // set same texture filter (no mipmaps supported due to the nature of lightmaps)
-  texture.magFilter = textureFilter;
-  texture.minFilter = textureFilter;
-  texture.generateMipmaps = false;
-
-  return texture;
-}
-
 async function runOffscreenWorkflow(
   scene: React.ReactNode,
   settings: OffscreenSettings
@@ -315,12 +293,7 @@ const Lightmap: React.FC<React.PropsWithChildren<LightmapProps>> = ({
     );
 
     // copy texture data since this is a foreign canvas
-    const texture = createLightmapTexture(
-      result.irradianceData,
-      result.irradianceWidth,
-      result.irradianceHeight,
-      result.irradiance.magFilter
-    );
+    const texture = result.createOutputTexture();
 
     updateFinalSceneMaterials(
       sceneRef.current,
