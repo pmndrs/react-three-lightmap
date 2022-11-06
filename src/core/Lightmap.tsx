@@ -56,6 +56,7 @@ export const DebugContext = React.createContext<{
   outputTexture: THREE.Texture;
 } | null>(null);
 
+// main asynchronous workflow sequence
 async function runWorkflow(
   scene: THREE.Scene,
   props: WorkbenchSettings,
@@ -80,7 +81,7 @@ const LightmapMain: React.FC<
   }
 > = (props) => {
   // read once
-  const propsRef = useRef(props);
+  const initialPropsRef = useRef(props);
 
   const requestWork = useWorkRequest();
 
@@ -122,7 +123,7 @@ const LightmapMain: React.FC<
         // @todo check if this runs multiple times on some React versions???
         return runWorkflow(
           scene,
-          propsRef.current,
+          initialPropsRef.current,
           requestWork,
           (debugWorkbench) => {
             setWorkbench(debugWorkbench);
@@ -166,19 +167,18 @@ export type LightmapProps = WorkbenchSettings & {
   onComplete?: (result: THREE.Texture) => void;
 };
 
-const Lightmap = React.forwardRef<
-  THREE.Scene,
-  React.PropsWithChildren<LightmapProps>
->(({ workPerFrame, children, ...props }, sceneRef) => {
+const Lightmap: React.FC<React.PropsWithChildren<LightmapProps>> = ({
+  workPerFrame,
+  children,
+  ...props
+}) => {
   return (
     <WorkManager workPerFrame={workPerFrame}>
       <LightmapMain {...props}>
-        <scene name="Lightmap Scene" ref={sceneRef}>
-          {children}
-        </scene>
+        <scene name="Lightmap Scene">{children}</scene>
       </LightmapMain>
     </WorkManager>
   );
-});
+};
 
 export default Lightmap;
