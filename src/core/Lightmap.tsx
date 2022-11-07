@@ -140,13 +140,14 @@ type OffscreenSettings = WorkbenchSettings & {
   workPerFrame?: number; // @todo allow fractions, dynamic value
 };
 
-// @todo allow early cancellation
+// main async workflow, allows early cancellation via abortPromise
 async function runOffscreenWorkflow(
   content: React.ReactNode,
-  settings: OffscreenSettings
+  settings: OffscreenSettings,
+  abortPromise: Promise<void>
 ) {
   // render hidden canvas with the given content, wait for suspense to finish loading inside it
-  const { gl, scene } = await new Promise<{
+  const scenePromise = await new Promise<{
     gl: THREE.WebGLRenderer;
     scene: THREE.Scene;
   }>((resolve) => {
@@ -171,8 +172,20 @@ async function runOffscreenWorkflow(
     );
   });
 
-  // our own work manager
-  const requestWork = createWorkManager(gl, settings.workPerFrame);
+  // preempt any further logic if already aborted
+  const { gl, scene } = await Promise.race([
+    scenePromise,
+    abortPromise.then(() => {
+      throw new Error('aborted before scene is complete');
+    })
+  ]);
+
+  // our own work manager (which is aware of the abort signal promise)
+  const requestWork = createWorkManager(
+    gl,
+    abortPromise,
+    settings.workPerFrame
+  );
 
   const workbench = await initializeWorkbench(scene, settings, requestWork);
   // @todo this onWorkbenchDebug(workbench);
@@ -198,15 +211,30 @@ const Lightmap: React.FC<React.PropsWithChildren<LightmapProps>> = ({
   const [result, setResult] = useState<Workbench | null>(null);
 
   useLayoutEffect(() => {
-    // not tracking unmount here because the work manager will bail out anyway when unmounted early
     // @todo check if this runs multiple times on some React versions???
-    // @todo clean up when unmounting early
     const { children, ...settings } = initialPropsRef.current;
-    const workflowResult = runOffscreenWorkflow(children, settings);
+
+    // set up abort signal promise
+    let abortResolver = () => undefined as void;
+    const abortPromise = new Promise<void>((resolve) => {
+      abortResolver = resolve;
+    });
+
+    // run main logic with the abort signal promise
+    const workflowResult = runOffscreenWorkflow(
+      children,
+      settings,
+      abortPromise
+    );
 
     workflowResult.then((result) => {
       setResult(result);
     });
+
+    // on early unmount, resolve the abort signal promise
+    return () => {
+      abortResolver();
+    };
   }, []);
 
   const sceneRef = useRef<THREE.Scene>(null);

@@ -15,6 +15,7 @@ const DUMMY_REJECTOR = (_error: unknown) => {};
 // (with some tricks like randomizing the task pop, etc)
 export function createWorkManager(
   gl: THREE.WebGLRenderer,
+  abortPromise: Promise<void>,
   workPerFrame?: number
 ): WorkRequester {
   const workPerFrameReal = Math.max(1, workPerFrame || DEFAULT_WORK_PER_FRAME);
@@ -22,39 +23,35 @@ export function createWorkManager(
   let rafActive = false;
   const pendingTasks: WorkTask[] = [];
 
-  /* @todo cleanup logic
-  const unmountedRef = useRef(false);
-  useEffect(() => {
-    return () => {
-      // prevent further scheduling
-      unmountedRef.current = true;
+  // wait for early stop
+  let isStopped = false;
+  abortPromise.then(() => {
+    // prevent further scheduling
+    isStopped = true;
 
-      // clear out all the pending tasks
-      const cleanupList = [...pendingTasksRef.current];
-      pendingTasksRef.current.length = 0;
+    // clear out all the pending tasks
+    const cleanupList = [...pendingTasks];
+    pendingTasks.length = 0;
 
-      // safely notify existing awaiters that no more work can be done at all
-      // (this helps clean up async jobs that were already scheduled)
-      for (const task of cleanupList) {
-        try {
-          task.reject(
-            new Error('work manager was unmounted while waiting for RAF')
-          );
-        } catch (_error) {
-          // no-op
-        }
+    // safely notify existing awaiters that no more work can be done at all
+    // (this helps clean up async jobs that were already scheduled)
+    for (const task of cleanupList) {
+      try {
+        task.reject(
+          new Error('work manager was unmounted while waiting for RAF')
+        );
+      } catch (_error) {
+        // no-op
       }
-    };
-  }, []);
-  */
+    }
+  });
 
   // awaitable request for next microtask inside RAF
   const requestWork = () => {
     // this helps break out of long-running async jobs
-    // @todo
-    // if (unmountedRef.current) {
-    //   throw new Error('work manager is no longer available');
-    // }
+    if (isStopped) {
+      throw new Error('work manager is no longer available');
+    }
 
     // schedule next RAF if needed
     if (!rafActive) {
