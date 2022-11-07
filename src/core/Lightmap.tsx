@@ -107,7 +107,7 @@ const WorkSceneWrapper: React.FC<{
   const onReadyRef = useRef(props.onReady);
   onReadyRef.current = props.onReady;
 
-  const sceneRef = useRef<THREE.Scene>();
+  const sceneRef = useRef<THREE.Scene>(null);
   useLayoutEffect(() => {
     // kick off the asynchronous workflow process in the parent
     // (this runs when scene content is loaded and suspensions are finished)
@@ -157,13 +157,15 @@ async function runOffscreenWorkflow(
     });
 
     root.render(
-      <WorkSceneWrapper
-        onReady={(gl, scene) => {
-          resolve({ gl, scene });
-        }}
-      >
-        {content}
-      </WorkSceneWrapper>
+      <React.Suspense fallback={null}>
+        <WorkSceneWrapper
+          onReady={(gl, scene) => {
+            resolve({ gl, scene });
+          }}
+        >
+          {content}
+        </WorkSceneWrapper>
+      </React.Suspense>
     );
   });
 
