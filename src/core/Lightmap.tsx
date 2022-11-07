@@ -326,6 +326,8 @@ const Lightmap: React.FC<React.PropsWithChildren<LightmapProps>> = ({
     }
   }, [result]);
 
+  // show final scene only when baking is done because it may contain loaded GLTF mesh instances
+  // (which end up cached and reused, so only one scene can attach them at a time anyway)
   return (
     <DebugContext.Provider value={debugInfo}>
       {result ? (

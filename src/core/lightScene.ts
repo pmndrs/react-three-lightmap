@@ -27,6 +27,9 @@ const ORIGINAL_MATERIAL_KEY = Symbol(
 );
 type UserDataStore<T extends symbol, V> = Record<T, V | undefined>;
 
+// set up baking-friendly materials and clean up when done
+// (the cleanup is done in case the scene contains loaded GLTF mesh instances,
+// they will be re-attached from baking scene to final scene as is)
 export async function withLightScene(
   workbench: Workbench,
   taskCallback: () => Promise<void>
