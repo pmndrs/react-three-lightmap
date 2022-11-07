@@ -103,7 +103,7 @@ const WorkSceneWrapper: React.FC<{
 }> = (props) => {
   const { gl } = useThree(); // @todo use state selector
 
-  // track latest reference to onComplete callback
+  // track latest reference to onReady callback
   const onReadyRef = useRef(props.onReady);
   onReadyRef.current = props.onReady;
 
@@ -211,6 +211,10 @@ const Lightmap: React.FC<React.PropsWithChildren<LightmapProps>> = ({
 }) => {
   const initialPropsRef = useRef(props);
 
+  // track latest reference to onComplete callback
+  const onCompleteRef = useRef(onComplete);
+  onCompleteRef.current = onComplete;
+
   // track one-time flip from disabled to non-disabled
   // (i.e. once allowStart is true, keep it true)
   const disabledStartRef = useRef(true);
@@ -308,7 +312,7 @@ const Lightmap: React.FC<React.PropsWithChildren<LightmapProps>> = ({
       }
     );
 
-    // copy texture data since this is a foreign canvas
+    // copy texture data since this is coming from a foreign canvas
     const texture = result.createOutputTexture();
 
     updateFinalSceneMaterials(
@@ -316,6 +320,11 @@ const Lightmap: React.FC<React.PropsWithChildren<LightmapProps>> = ({
       texture,
       !!initialPropsRef.current.ao
     );
+
+    // notify listener and pass the texture instance intended for parent GL context
+    if (onCompleteRef.current) {
+      onCompleteRef.current(texture);
+    }
   }, [result]);
 
   return (

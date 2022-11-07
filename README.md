@@ -22,7 +22,7 @@ Example:
 
 **[Try it in this editable sandbox](https://codesandbox.io/s/github/pmndrs/react-three-lightmap/tree/v0.0.8/demo-sandbox)**.
 
-NOTE: if you are using `mode="legacy"` on your `<Canvas>` tag please add `legacySuspense` flag to the lightmap, otherwise it will not wait until your scene content is fully loaded. This is not an issue in most situations, unless you have explicitly set the mode prop on `<Canvas>`.
+NOTE: actual lightmap rendering is performed on a separate hidden canvas and WebGL context. If you are consuming any context in your lightmapped content, you will need to "bridge" that context.
 
 To track when baking is complete, provide `onComplete` callback to `Lightmap` - it will be called with the resulting texture as the first argument. The library does automatically assign that texture as the lightmap on all the baked mesh materials too.
 
