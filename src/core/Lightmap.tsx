@@ -96,23 +96,6 @@ function updateFinalSceneMaterials(
   }
 }
 
-// main asynchronous workflow sequence
-async function runWorkflow(
-  scene: THREE.Scene,
-  props: WorkbenchSettings,
-  requestWork: () => Promise<THREE.WebGLRenderer>,
-  onWorkbenchDebug: (workbench: Workbench) => void
-) {
-  const workbench = await initializeWorkbench(scene, props, requestWork);
-  onWorkbenchDebug(workbench);
-
-  await withLightScene(workbench, async () => {
-    await runBakingPasses(workbench, requestWork);
-  });
-
-  return workbench;
-}
-
 // @todo disabled prop
 const WorkSceneWrapper: React.FC<{
   onReady: (gl: THREE.WebGLRenderer, scene: THREE.Scene) => void;
@@ -157,6 +140,7 @@ type OffscreenSettings = WorkbenchSettings & {
   workPerFrame?: number; // @todo allow fractions, dynamic value
 };
 
+// @todo allow early cancellation
 async function runOffscreenWorkflow(
   content: React.ReactNode,
   settings: OffscreenSettings
@@ -190,11 +174,14 @@ async function runOffscreenWorkflow(
   // our own work manager
   const requestWork = createWorkManager(gl, settings.workPerFrame);
 
-  // not tracking unmount here because the work manager will bail out anyway when unmounted early
-  // @todo check if this runs multiple times on some React versions???
-  return runWorkflow(scene, settings, requestWork, (debugWorkbench) => {
-    // @todo this setWorkbench(debugWorkbench);
+  const workbench = await initializeWorkbench(scene, settings, requestWork);
+  // @todo this onWorkbenchDebug(workbench);
+
+  await withLightScene(workbench, async () => {
+    await runBakingPasses(workbench, requestWork);
   });
+
+  return workbench;
 }
 
 export type LightmapProps = WorkbenchSettings & {
@@ -212,6 +199,8 @@ const Lightmap: React.FC<React.PropsWithChildren<LightmapProps>> = ({
   const [result, setResult] = useState<Workbench | null>(null);
 
   useLayoutEffect(() => {
+    // not tracking unmount here because the work manager will bail out anyway when unmounted early
+    // @todo check if this runs multiple times on some React versions???
     // @todo clean up when unmounting early
     const { children, ...settings } = initialPropsRef.current;
     const workflowResult = runOffscreenWorkflow(children, settings);
