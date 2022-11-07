@@ -55,7 +55,8 @@ function storeLightMapValue(
 
 export async function runBakingPasses(
   workbench: Workbench,
-  requestWork: () => Promise<THREE.WebGLRenderer>
+  requestWork: () => Promise<THREE.WebGLRenderer>,
+  onDebugPassComplete?: (outputData: Float32Array) => void
 ) {
   await withLightProbe(
     workbench.aoMode,
@@ -100,9 +101,13 @@ export async function runBakingPasses(
         }
 
         // pass is complete, apply the computed texels into active lightmap
-        // (used in the next pass and final display)
+        // (used in the next pass)
         irradianceData.set(passOutputData);
         irradiance.needsUpdate = true;
+
+        if (onDebugPassComplete) {
+          onDebugPassComplete(passOutputData);
+        }
       }
     }
   );

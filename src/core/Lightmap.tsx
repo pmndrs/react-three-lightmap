@@ -54,10 +54,11 @@ export const LightmapIgnore: React.FC<{ children: React.ReactNode }> = ({
   );
 };
 
-export const DebugContext = React.createContext<{
+export interface DebugInfo {
   atlasTexture: THREE.Texture;
   outputTexture: THREE.Texture;
-} | null>(null);
+}
+export const DebugContext = React.createContext<DebugInfo | null>(null);
 
 // set the computed irradiance texture on real scene materials
 function updateFinalSceneMaterials(
@@ -118,19 +119,11 @@ const WorkSceneWrapper: React.FC<{
     onReadyRef.current(gl, scene);
   }, [gl]);
 
-  // @todo debug reference to workbench for intermediate display
-  const debugInfo = useMemo(() => null, []);
-
-  // wrap scene in an extra group object
-  // so that when this is hidden during suspension only the wrapper has visible=false
-  const content = (
+  // main baking scene container
+  return (
     <scene name="Lightmap Baking Scene" ref={sceneRef}>
       {props.children}
     </scene>
-  );
-
-  return (
-    <DebugContext.Provider value={debugInfo}>{content}</DebugContext.Provider>
   );
 };
 
@@ -142,7 +135,11 @@ type OffscreenSettings = WorkbenchSettings & {
 async function runOffscreenWorkflow(
   content: React.ReactNode,
   settings: OffscreenSettings,
-  abortPromise: Promise<void>
+  abortPromise: Promise<void>,
+  debugListeners: {
+    onAtlasMap: (atlasMap: Workbench['atlasMap']) => void;
+    onPassComplete: (data: Float32Array, width: number, height: number) => void;
+  }
 ) {
   // render hidden canvas with the given content, wait for suspense to finish loading inside it
   const scenePromise = await new Promise<{
@@ -186,10 +183,17 @@ async function runOffscreenWorkflow(
   );
 
   const workbench = await initializeWorkbench(scene, settings, requestWork);
-  // @todo this onWorkbenchDebug(workbench);
+
+  debugListeners.onAtlasMap(workbench.atlasMap); // expose atlas map for debugging
 
   await setLightSceneMaterials(workbench);
-  await runBakingPasses(workbench, requestWork);
+  await runBakingPasses(workbench, requestWork, (data) => {
+    debugListeners.onPassComplete(
+      data,
+      workbench.atlasMap.width,
+      workbench.atlasMap.height
+    );
+  });
 
   return workbench;
 }
@@ -214,6 +218,7 @@ const Lightmap: React.FC<React.PropsWithChildren<LightmapProps>> = ({
   const allowStart = !disabledStartRef.current;
 
   const [result, setResult] = useState<Workbench | null>(null);
+  const [debugInfo, setDebugInfo] = useState<DebugInfo | null>(null);
 
   useLayoutEffect(() => {
     // @todo check if this runs multiple times on some React versions???
@@ -230,7 +235,49 @@ const Lightmap: React.FC<React.PropsWithChildren<LightmapProps>> = ({
       const workflowResult = runOffscreenWorkflow(
         children,
         settings,
-        abortPromise
+        abortPromise,
+        {
+          onAtlasMap(atlasMap) {
+            // initialize debug display of atlas texture as well as blank placeholder for output
+            const atlasTexture = new THREE.DataTexture(
+              atlasMap.data,
+              atlasMap.width,
+              atlasMap.height,
+              THREE.RGBAFormat,
+              THREE.FloatType
+            );
+
+            const outputTexture = new THREE.DataTexture(
+              new Float32Array(atlasMap.width * atlasMap.height),
+              atlasMap.width,
+              atlasMap.height,
+              THREE.RGBAFormat,
+              THREE.FloatType
+            );
+
+            setDebugInfo({
+              atlasTexture,
+              outputTexture
+            });
+          },
+          onPassComplete(data, width, height) {
+            setDebugInfo(
+              (prev) =>
+                prev && {
+                  ...prev,
+
+                  // replace with a new texture with copied source buffer data
+                  outputTexture: new THREE.DataTexture(
+                    new Float32Array(data),
+                    width,
+                    height,
+                    THREE.RGBAFormat,
+                    THREE.FloatType
+                  )
+                }
+            );
+          }
+        }
       );
 
       workflowResult.then((result) => {
@@ -272,9 +319,11 @@ const Lightmap: React.FC<React.PropsWithChildren<LightmapProps>> = ({
   }, [result]);
 
   return (
-    <scene name="Lightmap Result Scene" ref={sceneRef}>
-      {props.children}
-    </scene>
+    <DebugContext.Provider value={debugInfo}>
+      <scene name="Lightmap Result Scene" ref={sceneRef}>
+        {props.children}
+      </scene>
+    </DebugContext.Provider>
   );
 };
 
