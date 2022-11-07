@@ -96,7 +96,6 @@ function updateFinalSceneMaterials(
   }
 }
 
-// @todo disabled prop
 const WorkSceneWrapper: React.FC<{
   onReady: (gl: THREE.WebGLRenderer, scene: THREE.Scene) => void;
   children: React.ReactNode;
@@ -135,7 +134,6 @@ const WorkSceneWrapper: React.FC<{
   );
 };
 
-// @todo deal with disabled flag
 type OffscreenSettings = WorkbenchSettings & {
   workPerFrame?: number; // @todo allow fractions, dynamic value
 };
@@ -197,16 +195,23 @@ async function runOffscreenWorkflow(
 }
 
 export type LightmapProps = WorkbenchSettings & {
-  disabled?: boolean;
   workPerFrame?: number; // @todo allow fractions, dynamic value
+  disabled?: boolean;
   onComplete?: (result: THREE.Texture) => void;
 };
 
 const Lightmap: React.FC<React.PropsWithChildren<LightmapProps>> = ({
+  disabled,
   onComplete,
   ...props
 }) => {
   const initialPropsRef = useRef(props);
+
+  // track one-time flip from disabled to non-disabled
+  // (i.e. once allowStart is true, keep it true)
+  const disabledStartRef = useRef(true);
+  disabledStartRef.current = disabledStartRef.current && !!disabled;
+  const allowStart = !disabledStartRef.current;
 
   const [result, setResult] = useState<Workbench | null>(null);
 
@@ -221,21 +226,23 @@ const Lightmap: React.FC<React.PropsWithChildren<LightmapProps>> = ({
     });
 
     // run main logic with the abort signal promise
-    const workflowResult = runOffscreenWorkflow(
-      children,
-      settings,
-      abortPromise
-    );
+    if (allowStart) {
+      const workflowResult = runOffscreenWorkflow(
+        children,
+        settings,
+        abortPromise
+      );
 
-    workflowResult.then((result) => {
-      setResult(result);
-    });
+      workflowResult.then((result) => {
+        setResult(result);
+      });
+    }
 
     // on early unmount, resolve the abort signal promise
     return () => {
       abortResolver();
     };
-  }, []);
+  }, [allowStart]);
 
   const sceneRef = useRef<THREE.Scene>(null);
 
