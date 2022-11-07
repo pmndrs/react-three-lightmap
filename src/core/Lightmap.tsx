@@ -3,7 +3,7 @@
  * Licensed under the MIT license
  */
 
-import React, { useState, useMemo, useLayoutEffect, useRef } from 'react';
+import React, { useState, useLayoutEffect, useRef } from 'react';
 import { useThree, createRoot } from '@react-three/fiber';
 import * as THREE from 'three';
 
@@ -249,7 +249,7 @@ const Lightmap: React.FC<React.PropsWithChildren<LightmapProps>> = ({
             );
 
             const outputTexture = new THREE.DataTexture(
-              new Float32Array(atlasMap.width * atlasMap.height),
+              new Float32Array(atlasMap.width * atlasMap.height * 4),
               atlasMap.width,
               atlasMap.height,
               THREE.RGBAFormat,
