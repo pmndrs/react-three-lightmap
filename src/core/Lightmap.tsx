@@ -7,7 +7,7 @@ import React, { useState, useLayoutEffect, useRef } from 'react';
 import { useThree, createRoot } from '@react-three/fiber';
 import * as THREE from 'three';
 
-import { setLightSceneMaterials, materialIsSupported } from './lightScene';
+import { withLightScene, materialIsSupported } from './lightScene';
 import {
   initializeWorkbench,
   traverseSceneItems,
@@ -187,11 +187,11 @@ async function runOffscreenWorkflow(
   const workbench = await initializeWorkbench(scene, settings, requestWork);
   debugListeners.onAtlasMap(workbench.atlasMap); // expose atlas map for debugging
 
-  await setLightSceneMaterials(workbench);
-
-  await runBakingPasses(workbench, requestWork, (data, width, height) => {
-    // expose current pass output for debugging
-    debugListeners.onPassComplete(data, width, height);
+  await withLightScene(workbench, async () => {
+    await runBakingPasses(workbench, requestWork, (data, width, height) => {
+      // expose current pass output for debugging
+      debugListeners.onPassComplete(data, width, height);
+    });
   });
 
   return workbench;
