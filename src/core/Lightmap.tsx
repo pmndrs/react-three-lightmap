@@ -7,7 +7,7 @@ import React, { useState, useMemo, useLayoutEffect, useRef } from 'react';
 import { useThree, createRoot } from '@react-three/fiber';
 import * as THREE from 'three';
 
-import { withLightScene, materialIsSupported } from './lightScene';
+import { setLightSceneMaterials, materialIsSupported } from './lightScene';
 import {
   initializeWorkbench,
   traverseSceneItems,
@@ -177,9 +177,8 @@ async function runOffscreenWorkflow(
   const workbench = await initializeWorkbench(scene, settings, requestWork);
   // @todo this onWorkbenchDebug(workbench);
 
-  await withLightScene(workbench, async () => {
-    await runBakingPasses(workbench, requestWork);
-  });
+  await setLightSceneMaterials(workbench);
+  await runBakingPasses(workbench, requestWork);
 
   return workbench;
 }

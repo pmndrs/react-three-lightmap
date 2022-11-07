@@ -22,15 +22,7 @@ export function materialIsSupported(
   );
 }
 
-const ORIGINAL_MATERIAL_KEY = Symbol(
-  'lightmap baker: stashed original material'
-);
-type UserDataStore<T extends symbol, V> = Record<T, V | undefined>;
-
-export async function withLightScene(
-  workbench: Workbench,
-  taskCallback: () => Promise<void>
-) {
+export async function setLightSceneMaterials(workbench: Workbench) {
   // prepare the scene for baking
   const {
     aoMode,
@@ -41,25 +33,17 @@ export async function withLightScene(
   } = workbench;
 
   // process relevant meshes
-  const meshCleanupList: THREE.Mesh[] = [];
-  const suppressedCleanupList: THREE.Object3D[] = [];
-
   for (const object of traverseSceneItems(
     lightScene,
     false,
     (ignoredObject) => {
       // also prevent ignored items from rendering
-      // (do nothing if already invisible to avoid setting it back to visible on cleanup)
-      if (ignoredObject.visible) {
-        ignoredObject.visible = false;
-        suppressedCleanupList.push(ignoredObject);
-      }
+      ignoredObject.visible = false;
     }
   )) {
     // hide any visible lights to prevent interfering with AO
     if (aoMode && object instanceof THREE.Light) {
       object.visible = false;
-      suppressedCleanupList.push(object);
       continue;
     }
 
@@ -172,21 +156,10 @@ export async function withLightScene(
       return stagingMaterial;
     });
 
-    // stash original material list so that we can restore it later
-    (
-      mesh.userData as UserDataStore<
-        typeof ORIGINAL_MATERIAL_KEY,
-        THREE.Material[] | THREE.Material
-      >
-    )[ORIGINAL_MATERIAL_KEY] = mesh.material;
-
     // assign updated list or single material
     mesh.material = Array.isArray(mesh.material)
       ? stagingMaterialList
       : stagingMaterialList[0];
-
-    // keep a simple list for later cleanup
-    meshCleanupList.push(mesh);
   }
 
   let aoSceneLight: THREE.Light | null = null;
@@ -195,39 +168,5 @@ export async function withLightScene(
     // (this lights the texels unmasked by previous AO passes for further propagation)
     aoSceneLight = new THREE.AmbientLight('#ffffff');
     lightScene.add(aoSceneLight);
-  }
-
-  // perform main task and then clean up regardless of error state
-  try {
-    await taskCallback();
-  } finally {
-    // remove the staging ambient light
-    if (aoSceneLight) {
-      lightScene.remove(aoSceneLight);
-    }
-
-    // re-enable suppressed items (and lights if AO)
-    suppressedCleanupList.forEach((object) => {
-      object.visible = true;
-    });
-
-    // replace staging material with original
-    meshCleanupList.forEach((mesh) => {
-      // get stashed material and clean up object key
-      const userData = mesh.userData as UserDataStore<
-        typeof ORIGINAL_MATERIAL_KEY,
-        THREE.Material[] | THREE.Material | null
-      >;
-      const origMaterialValue = userData[ORIGINAL_MATERIAL_KEY];
-      delete userData[ORIGINAL_MATERIAL_KEY];
-
-      if (!origMaterialValue) {
-        console.error('lightmap baker: missing original material', mesh);
-        return;
-      }
-
-      // restore original setting
-      mesh.material = origMaterialValue;
-    });
   }
 }
