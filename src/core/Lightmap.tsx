@@ -183,16 +183,13 @@ async function runOffscreenWorkflow(
   );
 
   const workbench = await initializeWorkbench(scene, settings, requestWork);
-
   debugListeners.onAtlasMap(workbench.atlasMap); // expose atlas map for debugging
 
   await setLightSceneMaterials(workbench);
-  await runBakingPasses(workbench, requestWork, (data) => {
-    debugListeners.onPassComplete(
-      data,
-      workbench.atlasMap.width,
-      workbench.atlasMap.height
-    );
+
+  await runBakingPasses(workbench, requestWork, (data, width, height) => {
+    // expose current pass output for debugging
+    debugListeners.onPassComplete(data, width, height);
   });
 
   return workbench;

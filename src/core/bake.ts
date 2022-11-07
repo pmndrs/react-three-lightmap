@@ -56,7 +56,11 @@ function storeLightMapValue(
 export async function runBakingPasses(
   workbench: Workbench,
   requestWork: () => Promise<THREE.WebGLRenderer>,
-  onDebugPassComplete?: (outputData: Float32Array) => void
+  onDebugPassComplete?: (
+    outputData: Float32Array,
+    width: number,
+    height: number
+  ) => void
 ) {
   await withLightProbe(
     workbench.aoMode,
@@ -106,7 +110,7 @@ export async function runBakingPasses(
         irradiance.needsUpdate = true;
 
         if (onDebugPassComplete) {
-          onDebugPassComplete(passOutputData);
+          onDebugPassComplete(passOutputData, atlasWidth, atlasHeight);
         }
       }
     }
