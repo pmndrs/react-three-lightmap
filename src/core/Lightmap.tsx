@@ -328,9 +328,11 @@ const Lightmap: React.FC<React.PropsWithChildren<LightmapProps>> = ({
 
   return (
     <DebugContext.Provider value={debugInfo}>
-      <scene name="Lightmap Result Scene" ref={sceneRef}>
-        {props.children}
-      </scene>
+      {result ? (
+        <scene name="Lightmap Result Scene" ref={sceneRef}>
+          {props.children}
+        </scene>
+      ) : null}
     </DebugContext.Provider>
   );
 };
