@@ -3,19 +3,22 @@
  * Licensed under the MIT license
  */
 
-import React, { useState, useMemo, useLayoutEffect, useRef } from 'react';
+import React, { useState, useLayoutEffect, useRef } from 'react';
+import { useThree, createRoot } from '@react-three/fiber';
 import * as THREE from 'three';
 
-import { withLightScene } from './lightScene';
+import { withLightScene, materialIsSupported } from './lightScene';
 import {
   initializeWorkbench,
+  traverseSceneItems,
   Workbench,
   WorkbenchSettings,
   LIGHTMAP_READONLY_FLAG,
   LIGHTMAP_IGNORE_FLAG
 } from './workbench';
 import { runBakingPasses } from './bake';
-import WorkManager, { useWorkRequest } from './WorkManager';
+import { computeAutoUV2Layout } from './AutoUV2';
+import { createWorkManager } from './WorkManager';
 
 // prevent lightmap and UV2 generation for content
 // (but still allow contribution to lightmap, for e.g. emissive objects, large occluders, etc)
@@ -51,134 +54,289 @@ export const LightmapIgnore: React.FC<{ children: React.ReactNode }> = ({
   );
 };
 
-export const DebugContext = React.createContext<{
+export interface DebugInfo {
   atlasTexture: THREE.Texture;
   outputTexture: THREE.Texture;
-} | null>(null);
-
-async function runWorkflow(
-  scene: THREE.Scene,
-  props: WorkbenchSettings,
-  requestWork: () => Promise<THREE.WebGLRenderer>,
-  onWorkbenchDebug: (workbench: Workbench) => void
-) {
-  const workbench = await initializeWorkbench(scene, props, requestWork);
-  onWorkbenchDebug(workbench);
-
-  await withLightScene(workbench, async () => {
-    await runBakingPasses(workbench, requestWork);
-  });
-
-  return workbench.irradiance;
 }
+export const DebugContext = React.createContext<DebugInfo | null>(null);
 
-const LightmapMain: React.FC<
-  WorkbenchSettings & {
-    disabled?: boolean;
-    onComplete?: (result: THREE.Texture) => void;
-    children: React.ReactElement;
-  }
-> = (props) => {
-  // read once
-  const propsRef = useRef(props);
-
-  const requestWork = useWorkRequest();
-
-  // disabled prop can start out true and become false, but afterwards we ignore it
-  const enabledRef = useRef(!props.disabled);
-  enabledRef.current = enabledRef.current || !props.disabled;
-  const allowStart = enabledRef.current;
-
-  // track latest reference to onComplete callback
-  const onCompleteRef = useRef(props.onComplete);
-  onCompleteRef.current = props.onComplete;
-  useLayoutEffect(() => {
-    return () => {
-      // if we unmount early, prevent our async workflow from calling a stale callback
-      onCompleteRef.current = undefined;
-    };
-  }, []);
-
-  // debug reference to workbench for intermediate display
-  const [workbench, setWorkbench] = useState<Workbench | null>(null);
-
-  const sceneRef = useRef<unknown>();
-  useLayoutEffect(() => {
-    // ignore if nothing to do yet
-    if (!allowStart) {
-      return;
+// set the computed irradiance texture on real scene materials
+function updateFinalSceneMaterials(
+  scene: THREE.Scene,
+  irradiance: THREE.Texture,
+  aoMode: boolean
+) {
+  // process relevant meshes
+  for (const object of traverseSceneItems(scene, false)) {
+    // simple check for type (no need to check for uv2 presence)
+    if (!(object instanceof THREE.Mesh)) {
+      continue;
     }
 
-    // kick off the asynchronous workflow process
+    const mesh = object;
+
+    const materialList: (THREE.Material | null)[] = Array.isArray(mesh.material)
+      ? mesh.material
+      : [mesh.material];
+
+    // fill in the computed maps
+    materialList.forEach((material) => {
+      if (!material || !materialIsSupported(material)) {
+        return;
+      }
+
+      // set up our AO or lightmap as needed
+      if (aoMode) {
+        material.aoMap = irradiance;
+        material.needsUpdate = true;
+      } else {
+        material.lightMap = irradiance;
+        material.needsUpdate = true;
+      }
+    });
+  }
+}
+
+const WorkSceneWrapper: React.FC<{
+  onReady: (gl: THREE.WebGLRenderer, scene: THREE.Scene) => void;
+  children: React.ReactNode;
+}> = (props) => {
+  const { gl } = useThree(); // @todo use state selector
+
+  // track latest reference to onReady callback
+  const onReadyRef = useRef(props.onReady);
+  onReadyRef.current = props.onReady;
+
+  const sceneRef = useRef<THREE.Scene>(null);
+  useLayoutEffect(() => {
+    // kick off the asynchronous workflow process in the parent
     // (this runs when scene content is loaded and suspensions are finished)
-    Promise.resolve()
-      .then(() => {
-        const scene = sceneRef.current;
-        if (!scene || !(scene instanceof THREE.Scene)) {
-          throw new Error('expecting lightmap scene');
-        }
+    const scene = sceneRef.current;
+    if (!scene) {
+      throw new Error('expecting lightmap scene');
+    }
 
-        // not tracking unmount here because the work manager will bail out anyway when unmounted early
-        // @todo check if this runs multiple times on some React versions???
-        return runWorkflow(
-          scene,
-          propsRef.current,
-          requestWork,
-          (debugWorkbench) => {
-            setWorkbench(debugWorkbench);
-          }
-        );
-      })
-      .then((result) => {
-        if (onCompleteRef.current) {
-          onCompleteRef.current(result);
-        }
-      });
-  }, [allowStart, requestWork]);
+    onReadyRef.current(gl, scene);
+  }, [gl]);
 
-  const debugInfo = useMemo(
-    () =>
-      workbench
-        ? {
-            atlasTexture: workbench.atlasMap.texture,
-            outputTexture: workbench.irradiance
-          }
-        : null,
-    [workbench]
-  );
-
-  // wrap scene in an extra group object
-  // so that when this is hidden during suspension only the wrapper has visible=false
-  const content = (
-    <group name="Lightmap Scene Wrapper">
-      {React.cloneElement(props.children, { ref: sceneRef })}
-    </group>
-  );
-
+  // main baking scene container
   return (
-    <DebugContext.Provider value={debugInfo}>{content}</DebugContext.Provider>
+    <scene name="Lightmap Baking Scene" ref={sceneRef}>
+      {props.children}
+    </scene>
   );
 };
 
-export type LightmapProps = WorkbenchSettings & {
-  disabled?: boolean;
+type OffscreenSettings = WorkbenchSettings & {
   workPerFrame?: number; // @todo allow fractions, dynamic value
+};
+
+// main async workflow, allows early cancellation via abortPromise
+async function runOffscreenWorkflow(
+  content: React.ReactNode,
+  settings: OffscreenSettings,
+  abortPromise: Promise<void>,
+  debugListeners: {
+    onAtlasMap: (atlasMap: Workbench['atlasMap']) => void;
+    onPassComplete: (data: Float32Array, width: number, height: number) => void;
+  }
+) {
+  // render hidden canvas with the given content, wait for suspense to finish loading inside it
+  const scenePromise = await new Promise<{
+    gl: THREE.WebGLRenderer;
+    scene: THREE.Scene;
+  }>((resolve) => {
+    // just sensible small canvas, not actually used for direct output
+    const canvas = document.createElement('canvas');
+    canvas.width = 64;
+    canvas.height = 64;
+
+    const root = createRoot(canvas).configure({
+      frameloop: 'never', // framebuffer target rendering is inside own RAF loop
+      shadows: true // @todo use the original GL context settings
+    });
+
+    root.render(
+      <React.Suspense fallback={null}>
+        <WorkSceneWrapper
+          onReady={(gl, scene) => {
+            resolve({ gl, scene });
+          }}
+        >
+          {content}
+        </WorkSceneWrapper>
+      </React.Suspense>
+    );
+  });
+
+  // preempt any further logic if already aborted
+  const { gl, scene } = await Promise.race([
+    scenePromise,
+    abortPromise.then(() => {
+      throw new Error('aborted before scene is complete');
+    })
+  ]);
+
+  // our own work manager (which is aware of the abort signal promise)
+  const requestWork = createWorkManager(
+    gl,
+    abortPromise,
+    settings.workPerFrame
+  );
+
+  const workbench = await initializeWorkbench(scene, settings, requestWork);
+  debugListeners.onAtlasMap(workbench.atlasMap); // expose atlas map for debugging
+
+  await withLightScene(workbench, async () => {
+    await runBakingPasses(workbench, requestWork, (data, width, height) => {
+      // expose current pass output for debugging
+      debugListeners.onPassComplete(data, width, height);
+    });
+  });
+
+  return workbench;
+}
+
+export type LightmapProps = WorkbenchSettings & {
+  workPerFrame?: number; // @todo allow fractions, dynamic value
+  disabled?: boolean;
   onComplete?: (result: THREE.Texture) => void;
 };
 
-const Lightmap = React.forwardRef<
-  THREE.Scene,
-  React.PropsWithChildren<LightmapProps>
->(({ workPerFrame, children, ...props }, sceneRef) => {
+const Lightmap: React.FC<React.PropsWithChildren<LightmapProps>> = ({
+  disabled,
+  onComplete,
+  ...props
+}) => {
+  const initialPropsRef = useRef(props);
+
+  // track latest reference to onComplete callback
+  const onCompleteRef = useRef(onComplete);
+  onCompleteRef.current = onComplete;
+
+  // track one-time flip from disabled to non-disabled
+  // (i.e. once allowStart is true, keep it true)
+  const disabledStartRef = useRef(true);
+  disabledStartRef.current = disabledStartRef.current && !!disabled;
+  const allowStart = !disabledStartRef.current;
+
+  const [result, setResult] = useState<Workbench | null>(null);
+  const [debugInfo, setDebugInfo] = useState<DebugInfo | null>(null);
+
+  useLayoutEffect(() => {
+    // @todo check if this runs multiple times on some React versions???
+    const { children, ...settings } = initialPropsRef.current;
+
+    // set up abort signal promise
+    let abortResolver = () => undefined as void;
+    const abortPromise = new Promise<void>((resolve) => {
+      abortResolver = resolve;
+    });
+
+    // run main logic with the abort signal promise
+    if (allowStart) {
+      const workflowResult = runOffscreenWorkflow(
+        children,
+        settings,
+        abortPromise,
+        {
+          onAtlasMap(atlasMap) {
+            // initialize debug display of atlas texture as well as blank placeholder for output
+            const atlasTexture = new THREE.DataTexture(
+              atlasMap.data,
+              atlasMap.width,
+              atlasMap.height,
+              THREE.RGBAFormat,
+              THREE.FloatType
+            );
+
+            const outputTexture = new THREE.DataTexture(
+              new Float32Array(atlasMap.width * atlasMap.height * 4),
+              atlasMap.width,
+              atlasMap.height,
+              THREE.RGBAFormat,
+              THREE.FloatType
+            );
+
+            setDebugInfo({
+              atlasTexture,
+              outputTexture
+            });
+          },
+          onPassComplete(data, width, height) {
+            setDebugInfo(
+              (prev) =>
+                prev && {
+                  ...prev,
+
+                  // replace with a new texture with copied source buffer data
+                  outputTexture: new THREE.DataTexture(
+                    new Float32Array(data),
+                    width,
+                    height,
+                    THREE.RGBAFormat,
+                    THREE.FloatType
+                  )
+                }
+            );
+          }
+        }
+      );
+
+      workflowResult.then((result) => {
+        setResult(result);
+      });
+    }
+
+    // on early unmount, resolve the abort signal promise
+    return () => {
+      abortResolver();
+    };
+  }, [allowStart]);
+
+  const sceneRef = useRef<THREE.Scene>(null);
+
+  useLayoutEffect(() => {
+    if (!result || !sceneRef.current) {
+      return;
+    }
+
+    // create UV2 coordinates for the final scene meshes
+    // @todo somehow reuse ones from the baker?
+    computeAutoUV2Layout(
+      initialPropsRef.current.lightMapSize,
+      traverseSceneItems(sceneRef.current, true),
+      {
+        texelsPerUnit: result.texelsPerUnit
+      }
+    );
+
+    // copy texture data since this is coming from a foreign canvas
+    const texture = result.createOutputTexture();
+
+    updateFinalSceneMaterials(
+      sceneRef.current,
+      texture,
+      !!initialPropsRef.current.ao
+    );
+
+    // notify listener and pass the texture instance intended for parent GL context
+    if (onCompleteRef.current) {
+      onCompleteRef.current(texture);
+    }
+  }, [result]);
+
+  // show final scene only when baking is done because it may contain loaded GLTF mesh instances
+  // (which end up cached and reused, so only one scene can attach them at a time anyway)
   return (
-    <WorkManager workPerFrame={workPerFrame}>
-      <LightmapMain {...props}>
-        <scene name="Lightmap Scene" ref={sceneRef}>
-          {children}
+    <DebugContext.Provider value={debugInfo}>
+      {result ? (
+        <scene name="Lightmap Result Scene" ref={sceneRef}>
+          {props.children}
         </scene>
-      </LightmapMain>
-    </WorkManager>
+      ) : null}
+    </DebugContext.Provider>
   );
-});
+};
 
 export default Lightmap;

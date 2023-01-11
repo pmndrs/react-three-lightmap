@@ -9,6 +9,7 @@ export interface Workbench {
   aoDistance: number;
   emissiveMultiplier: number;
   bounceMultiplier: number;
+  texelsPerUnit: number;
 
   lightScene: THREE.Scene;
   atlasMap: AtlasMap;
@@ -16,6 +17,8 @@ export interface Workbench {
   // lightmap output
   irradiance: THREE.Texture;
   irradianceData: Float32Array;
+
+  createOutputTexture: () => THREE.Texture;
 
   // sampler settings
   settings: LightProbeSettings;
@@ -148,25 +151,17 @@ export async function initializeWorkbench(
     ...samplerSettings
   };
 
-  // parse the convenience setting
-  const [initialWidth, initialHeight] = lightMapSize
-    ? [
-        typeof lightMapSize === 'number' ? lightMapSize : lightMapSize[0],
-        typeof lightMapSize === 'number' ? lightMapSize : lightMapSize[1]
-      ]
-    : [undefined, undefined];
-
   // wait a bit for responsiveness
   await requestNextTick();
 
   // perform UV auto-layout in next tick
+  const realTexelsPerUnit = texelsPerUnit || DEFAULT_TEXELS_PER_UNIT;
 
   const [computedWidth, computedHeight] = computeAutoUV2Layout(
-    initialWidth,
-    initialHeight,
+    lightMapSize,
     traverseSceneItems(scene, true),
     {
-      texelsPerUnit: texelsPerUnit || DEFAULT_TEXELS_PER_UNIT
+      texelsPerUnit: realTexelsPerUnit
     }
   );
 
@@ -202,12 +197,31 @@ export async function initializeWorkbench(
         ? DEFAULT_EMISSIVE_MULTIPLIER
         : emissiveMultiplier,
     bounceMultiplier: bounceMultiplier === undefined ? 1 : bounceMultiplier,
+    texelsPerUnit: realTexelsPerUnit,
 
     lightScene: scene,
     atlasMap,
 
     irradiance,
     irradianceData,
+
+    // clone the lightmap/AO map to use in a different GL context
+    createOutputTexture(): THREE.Texture {
+      const texture = new THREE.DataTexture(
+        irradianceData,
+        lightMapWidth,
+        lightMapHeight,
+        THREE.RGBAFormat,
+        THREE.FloatType
+      );
+
+      // set same texture filter (no mipmaps supported due to the nature of lightmaps)
+      texture.magFilter = irradiance.magFilter;
+      texture.minFilter = irradiance.minFilter;
+      texture.generateMipmaps = false;
+
+      return texture;
+    },
 
     settings: settings
   };

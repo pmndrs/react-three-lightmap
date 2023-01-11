@@ -17,7 +17,6 @@ export interface AtlasMap {
   height: number;
   items: AtlasMapItem[];
   data: Float32Array;
-  texture: THREE.Texture;
 }
 
 // must be black for full zeroing
@@ -306,13 +305,6 @@ export function renderAtlas(
   return {
     width: width,
     height: height,
-    texture: new THREE.DataTexture(
-      orthoData,
-      width,
-      height,
-      THREE.RGBAFormat,
-      THREE.FloatType
-    ),
     data: orthoData,
 
     // no need to expose references to atlas-specific geometry clones

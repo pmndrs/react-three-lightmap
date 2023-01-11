@@ -5,13 +5,13 @@ import {
   traversalStateIsReadOnly
 } from './workbench';
 
-type SupportedMaterial =
+export type SupportedMaterial =
   | THREE.MeshLambertMaterial
   | THREE.MeshPhongMaterial
   | THREE.MeshStandardMaterial
   | THREE.MeshPhysicalMaterial;
 
-function materialIsSupported(
+export function materialIsSupported(
   material: THREE.Material
 ): material is SupportedMaterial {
   return (
@@ -27,6 +27,9 @@ const ORIGINAL_MATERIAL_KEY = Symbol(
 );
 type UserDataStore<T extends symbol, V> = Record<T, V | undefined>;
 
+// set up baking-friendly materials and clean up when done
+// (the cleanup is done in case the scene contains loaded GLTF mesh instances,
+// they will be re-attached from baking scene to final scene as is)
 export async function withLightScene(
   workbench: Workbench,
   taskCallback: () => Promise<void>
@@ -198,10 +201,8 @@ export async function withLightScene(
   }
 
   // perform main task and then clean up regardless of error state
-  let finishedTask = false;
   try {
     await taskCallback();
-    finishedTask = true;
   } finally {
     // remove the staging ambient light
     if (aoSceneLight) {
@@ -230,30 +231,6 @@ export async function withLightScene(
 
       // restore original setting
       mesh.material = origMaterialValue;
-
-      // fill in the computed maps if task was successful
-      if (finishedTask) {
-        const materialList: (THREE.Material | null)[] = Array.isArray(
-          origMaterialValue
-        )
-          ? origMaterialValue
-          : [origMaterialValue];
-
-        materialList.forEach((material) => {
-          if (!material || !materialIsSupported(material)) {
-            return;
-          }
-
-          // set up our AO or lightmap as needed
-          if (aoMode) {
-            material.aoMap = irradiance;
-            material.needsUpdate = true;
-          } else {
-            material.lightMap = irradiance;
-            material.needsUpdate = true;
-          }
-        });
-      }
     });
   }
 }
