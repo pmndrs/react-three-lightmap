@@ -46,15 +46,17 @@ export type OffscreenSettings = WorkbenchSettings & {
   workPerFrame?: number; // @todo allow fractions, dynamic value
 };
 
+export interface Debug {
+  onAtlasMap: (atlasMap: Workbench['atlasMap']) => void;
+  onPassComplete: (data: Float32Array, width: number, height: number) => void;
+}
+
 // main async workflow, allows early cancellation via abortPromise
 export async function runOffscreenWorkflow(
   content: React.ReactNode,
   settings: OffscreenSettings,
   abortPromise: Promise<void>,
-  debugListeners: {
-    onAtlasMap: (atlasMap: Workbench['atlasMap']) => void;
-    onPassComplete: (data: Float32Array, width: number, height: number) => void;
-  }
+  debugListeners?: Debug
 ) {
   // render hidden canvas with the given content, wait for suspense to finish loading inside it
   const scenePromise = await new Promise<{
@@ -100,12 +102,12 @@ export async function runOffscreenWorkflow(
   );
 
   const workbench = await initializeWorkbench(scene, settings, requestWork);
-  debugListeners.onAtlasMap(workbench.atlasMap); // expose atlas map for debugging
+  debugListeners?.onAtlasMap(workbench.atlasMap); // expose atlas map for debugging
 
   await withLightScene(workbench, async () => {
     await runBakingPasses(workbench, requestWork, (data, width, height) => {
       // expose current pass output for debugging
-      debugListeners.onPassComplete(data, width, height);
+      debugListeners?.onPassComplete(data, width, height);
     });
   });
 
