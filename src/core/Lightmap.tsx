@@ -3,7 +3,7 @@
  * Licensed under the MIT license
  */
 
-import React, { useState, useLayoutEffect, useRef } from 'react';
+import React, { useState, useMemo, useLayoutEffect, useRef } from 'react';
 import * as THREE from 'three';
 
 import { materialIsSupported } from './lightScene';
@@ -14,7 +14,7 @@ import {
   LIGHTMAP_IGNORE_FLAG
 } from './workbench';
 import { computeAutoUV2Layout } from './AutoUV2';
-import { useOffscreenWorkflow, Debug } from './offscreenWorkflow';
+import { useOffscreenWorkflow, DebugListener } from './offscreenWorkflow';
 
 // prevent lightmap and UV2 generation for content
 // (but still allow contribution to lightmap, for e.g. emissive objects, large occluders, etc)
@@ -55,6 +55,72 @@ export interface DebugInfo {
   outputTexture: THREE.Texture;
 }
 export const DebugContext = React.createContext<DebugInfo | null>(null);
+
+const DebugListenerContext = React.createContext<DebugListener | null>(null);
+
+// debug helper hook that returns current known debug state and context wrapper
+export function useLightmapDebug(): [
+  DebugInfo | null,
+  React.FC<React.PropsWithChildren>
+] {
+  const [debugInfo, setDebugInfo] = useState<DebugInfo | null>(null);
+
+  // stable value to pass down via context to the lightmap baker
+  const debugContextValue = useMemo<DebugListener>(
+    () => ({
+      onAtlasMap(atlasMap) {
+        // initialize debug display of atlas texture as well as blank placeholder for output
+        const atlasTexture = new THREE.DataTexture(
+          atlasMap.data,
+          atlasMap.width,
+          atlasMap.height,
+          THREE.RGBAFormat,
+          THREE.FloatType
+        );
+
+        const outputTexture = new THREE.DataTexture(
+          new Float32Array(atlasMap.width * atlasMap.height * 4),
+          atlasMap.width,
+          atlasMap.height,
+          THREE.RGBAFormat,
+          THREE.FloatType
+        );
+
+        setDebugInfo({
+          atlasTexture,
+          outputTexture
+        });
+      },
+      onPassComplete(data, width, height) {
+        setDebugInfo(
+          (prev) =>
+            prev && {
+              ...prev,
+
+              // replace with a new texture with copied source buffer data
+              outputTexture: new THREE.DataTexture(
+                new Float32Array(data),
+                width,
+                height,
+                THREE.RGBAFormat,
+                THREE.FloatType
+              )
+            }
+        );
+      }
+    }),
+    []
+  );
+
+  return [
+    debugInfo,
+    ({ children }) => (
+      <DebugListenerContext.Provider value={debugContextValue}>
+        {children}
+      </DebugListenerContext.Provider>
+    )
+  ];
+}
 
 // set the computed irradiance texture on real scene materials
 function updateFinalSceneMaterials(
@@ -111,7 +177,7 @@ const Lightmap: React.FC<React.PropsWithChildren<LightmapProps>> = ({
 
   // debug helper
   const [debugInfo, setDebugInfo] = useState<DebugInfo | null>(null);
-  const debug: Debug = {
+  const debug: DebugListener = {
     onAtlasMap(atlasMap) {
       // initialize debug display of atlas texture as well as blank placeholder for output
       const atlasTexture = new THREE.DataTexture(

@@ -46,7 +46,7 @@ export type OffscreenSettings = WorkbenchSettings & {
   workPerFrame?: number; // @todo allow fractions, dynamic value
 };
 
-export interface Debug {
+export interface DebugListener {
   onAtlasMap: (atlasMap: Workbench['atlasMap']) => void;
   onPassComplete: (data: Float32Array, width: number, height: number) => void;
 }
@@ -56,7 +56,7 @@ async function runOffscreenWorkflow(
   content: React.ReactNode,
   settings: OffscreenSettings,
   abortPromise: Promise<void>,
-  debugListeners?: Debug
+  debugListeners?: DebugListener
 ) {
   // render hidden canvas with the given content, wait for suspense to finish loading inside it
   const scenePromise = await new Promise<{
@@ -118,7 +118,7 @@ async function runOffscreenWorkflow(
 export function useOffscreenWorkflow(
   content: React.ReactNode | null | undefined,
   settings?: OffscreenSettings,
-  debugListeners?: Debug
+  debugListener?: DebugListener
 ) {
   // track the first reference to non-empty content
   const initialUsefulContentRef = useRef(content);
@@ -128,8 +128,8 @@ export function useOffscreenWorkflow(
   const settingsRef = useRef(settings);
   settingsRef.current = settings;
 
-  const debugRef = useRef(debugListeners);
-  debugRef.current = debugListeners;
+  const debugRef = useRef(debugListener);
+  debugRef.current = debugListener;
 
   const [result, setResult] = useState<Workbench | null>(null);
 
