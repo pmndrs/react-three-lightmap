@@ -9,13 +9,12 @@ import * as THREE from 'three';
 import { materialIsSupported } from './lightScene';
 import {
   traverseSceneItems,
-  Workbench,
   WorkbenchSettings,
   LIGHTMAP_READONLY_FLAG,
   LIGHTMAP_IGNORE_FLAG
 } from './workbench';
 import { computeAutoUV2Layout } from './AutoUV2';
-import { runOffscreenWorkflow } from './offscreenWorkflow';
+import { useOffscreenWorkflow, Debug } from './offscreenWorkflow';
 
 // prevent lightmap and UV2 generation for content
 // (but still allow contribution to lightmap, for e.g. emissive objects, large occluders, etc)
@@ -103,93 +102,64 @@ export type LightmapProps = WorkbenchSettings & {
 const Lightmap: React.FC<React.PropsWithChildren<LightmapProps>> = ({
   disabled,
   onComplete,
-  ...props
+  children,
+  ...settings
 }) => {
-  const initialPropsRef = useRef(props);
-
   // track latest reference to onComplete callback
   const onCompleteRef = useRef(onComplete);
   onCompleteRef.current = onComplete;
 
-  // track one-time flip from disabled to non-disabled
-  // (i.e. once allowStart is true, keep it true)
-  const disabledStartRef = useRef(true);
-  disabledStartRef.current = disabledStartRef.current && !!disabled;
-  const allowStart = !disabledStartRef.current;
-
-  const [result, setResult] = useState<Workbench | null>(null);
+  // debug helper
   const [debugInfo, setDebugInfo] = useState<DebugInfo | null>(null);
-
-  useLayoutEffect(() => {
-    // @todo check if this runs multiple times on some React versions???
-    const { children, ...settings } = initialPropsRef.current;
-
-    // set up abort signal promise
-    let abortResolver = () => undefined as void;
-    const abortPromise = new Promise<void>((resolve) => {
-      abortResolver = resolve;
-    });
-
-    // run main logic with the abort signal promise
-    if (allowStart) {
-      const workflowResult = runOffscreenWorkflow(
-        children,
-        settings,
-        abortPromise,
-        {
-          onAtlasMap(atlasMap) {
-            // initialize debug display of atlas texture as well as blank placeholder for output
-            const atlasTexture = new THREE.DataTexture(
-              atlasMap.data,
-              atlasMap.width,
-              atlasMap.height,
-              THREE.RGBAFormat,
-              THREE.FloatType
-            );
-
-            const outputTexture = new THREE.DataTexture(
-              new Float32Array(atlasMap.width * atlasMap.height * 4),
-              atlasMap.width,
-              atlasMap.height,
-              THREE.RGBAFormat,
-              THREE.FloatType
-            );
-
-            setDebugInfo({
-              atlasTexture,
-              outputTexture
-            });
-          },
-          onPassComplete(data, width, height) {
-            setDebugInfo(
-              (prev) =>
-                prev && {
-                  ...prev,
-
-                  // replace with a new texture with copied source buffer data
-                  outputTexture: new THREE.DataTexture(
-                    new Float32Array(data),
-                    width,
-                    height,
-                    THREE.RGBAFormat,
-                    THREE.FloatType
-                  )
-                }
-            );
-          }
-        }
+  const debug: Debug = {
+    onAtlasMap(atlasMap) {
+      // initialize debug display of atlas texture as well as blank placeholder for output
+      const atlasTexture = new THREE.DataTexture(
+        atlasMap.data,
+        atlasMap.width,
+        atlasMap.height,
+        THREE.RGBAFormat,
+        THREE.FloatType
       );
 
-      workflowResult.then((result) => {
-        setResult(result);
-      });
-    }
+      const outputTexture = new THREE.DataTexture(
+        new Float32Array(atlasMap.width * atlasMap.height * 4),
+        atlasMap.width,
+        atlasMap.height,
+        THREE.RGBAFormat,
+        THREE.FloatType
+      );
 
-    // on early unmount, resolve the abort signal promise
-    return () => {
-      abortResolver();
-    };
-  }, [allowStart]);
+      setDebugInfo({
+        atlasTexture,
+        outputTexture
+      });
+    },
+    onPassComplete(data, width, height) {
+      setDebugInfo(
+        (prev) =>
+          prev && {
+            ...prev,
+
+            // replace with a new texture with copied source buffer data
+            outputTexture: new THREE.DataTexture(
+              new Float32Array(data),
+              width,
+              height,
+              THREE.RGBAFormat,
+              THREE.FloatType
+            )
+          }
+      );
+    }
+  };
+
+  // main offscreen workflow state
+  const result = useOffscreenWorkflow(
+    disabled ? null : children,
+    settings,
+    debug
+  );
 
   const sceneRef = useRef<THREE.Scene>(null);
 
@@ -201,7 +171,7 @@ const Lightmap: React.FC<React.PropsWithChildren<LightmapProps>> = ({
     // create UV2 coordinates for the final scene meshes
     // @todo somehow reuse ones from the baker?
     computeAutoUV2Layout(
-      initialPropsRef.current.lightMapSize,
+      [result.atlasMap.width, result.atlasMap.height],
       traverseSceneItems(sceneRef.current, true),
       {
         texelsPerUnit: result.texelsPerUnit
@@ -211,11 +181,7 @@ const Lightmap: React.FC<React.PropsWithChildren<LightmapProps>> = ({
     // copy texture data since this is coming from a foreign canvas
     const texture = result.createOutputTexture();
 
-    updateFinalSceneMaterials(
-      sceneRef.current,
-      texture,
-      !!initialPropsRef.current.ao
-    );
+    updateFinalSceneMaterials(sceneRef.current, texture, result.aoMode);
 
     // notify listener and pass the texture instance intended for parent GL context
     if (onCompleteRef.current) {
@@ -229,7 +195,7 @@ const Lightmap: React.FC<React.PropsWithChildren<LightmapProps>> = ({
     <DebugContext.Provider value={debugInfo}>
       {result ? (
         <scene name="Lightmap Result Scene" ref={sceneRef}>
-          {props.children}
+          {children}
         </scene>
       ) : null}
     </DebugContext.Provider>

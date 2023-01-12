@@ -3,7 +3,7 @@
  * Licensed under the MIT license
  */
 
-import React, { useLayoutEffect, useRef } from 'react';
+import React, { useState, useLayoutEffect, useRef } from 'react';
 import { useThree, createRoot } from '@react-three/fiber';
 import * as THREE from 'three';
 
@@ -52,7 +52,7 @@ export interface Debug {
 }
 
 // main async workflow, allows early cancellation via abortPromise
-export async function runOffscreenWorkflow(
+async function runOffscreenWorkflow(
   content: React.ReactNode,
   settings: OffscreenSettings,
   abortPromise: Promise<void>,
@@ -112,4 +112,58 @@ export async function runOffscreenWorkflow(
   });
 
   return workbench;
+}
+
+// hook lifecycle for offscreen workflow
+export function useOffscreenWorkflow(
+  content: React.ReactNode | null | undefined,
+  settings?: OffscreenSettings,
+  debugListeners?: Debug
+) {
+  // track the first reference to non-empty content
+  const initialUsefulContentRef = useRef(content);
+  initialUsefulContentRef.current = initialUsefulContentRef.current || content;
+
+  // wrap latest value in ref to avoid triggering effect
+  const settingsRef = useRef(settings);
+  settingsRef.current = settings;
+
+  const debugRef = useRef(debugListeners);
+  debugRef.current = debugListeners;
+
+  const [result, setResult] = useState<Workbench | null>(null);
+
+  useLayoutEffect(() => {
+    // @todo check if this runs multiple times on some React versions???
+    const children = initialUsefulContentRef.current;
+    const settings = settingsRef.current;
+
+    // set up abort signal promise
+    let abortResolver = () => undefined as void;
+    const abortPromise = new Promise<void>((resolve) => {
+      abortResolver = resolve;
+    });
+
+    // run main logic with the abort signal promise
+    if (children) {
+      const workflowResult = runOffscreenWorkflow(
+        children,
+        settings ?? {},
+        abortPromise,
+        debugRef.current
+      );
+
+      workflowResult.then((result) => {
+        setResult(result);
+      });
+    }
+
+    // on early unmount, resolve the abort signal promise
+    return () => {
+      abortResolver();
+    };
+  }, [initialUsefulContentRef.current]);
+
+  // @todo clean up for direct consumption
+  return result;
 }
