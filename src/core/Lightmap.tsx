@@ -122,14 +122,16 @@ export function useLightmapDebug(): [
     []
   );
 
-  return [
-    debugInfo,
-    ({ children }) => (
+  // wrapper helper must be memoized to avoid render loop
+  const DebugWrapper = useMemo<React.FC<React.PropsWithChildren>>(() => {
+    return ({ children }) => (
       <DebugListenerContext.Provider value={debugContextValue}>
         {children}
       </DebugListenerContext.Provider>
-    )
-  ];
+    );
+  }, [debugContextValue]);
+
+  return [debugInfo, DebugWrapper];
 }
 
 // set the computed irradiance texture on real scene materials
