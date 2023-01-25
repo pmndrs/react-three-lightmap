@@ -1,10 +1,8 @@
-import React, { useMemo, useContext, useRef } from 'react';
-import { useFrame, useThree, createPortal } from '@react-three/fiber';
+import React, { useMemo, useRef } from 'react';
+import { useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 
-import { DebugContext } from '../core/Lightmap';
-
-const DebugOverlayContext = React.createContext<THREE.Scene | null>(null);
+import { useLightmapDebug, DebugInfo } from '../core/Lightmap';
 
 // set up a special render loop with a debug overlay for various widgets (see below)
 export const DebugOverlayRenderer: React.FC<{ children: React.ReactNode }> = ({
@@ -12,6 +10,8 @@ export const DebugOverlayRenderer: React.FC<{ children: React.ReactNode }> = ({
 }) => {
   const mainSceneRef = useRef<THREE.Scene>(null);
   const debugSceneRef = useRef<THREE.Scene>(null);
+
+  const [debugInfo, DebugWrapper] = useLightmapDebug();
 
   const { size } = useThree();
   const debugCamera = useMemo(() => {
@@ -33,57 +33,50 @@ export const DebugOverlayRenderer: React.FC<{ children: React.ReactNode }> = ({
 
   return (
     <>
-      <DebugOverlayContext.Provider value={debugSceneRef.current || null}>
+      <DebugWrapper>
         <scene name="Main Debug Stage" ref={mainSceneRef}>
           {children}
         </scene>
-      </DebugOverlayContext.Provider>
+      </DebugWrapper>
 
       {/* portal container for debug widgets */}
-      <scene name="Debug Overlay" ref={debugSceneRef} />
+      <scene name="Debug Overlay" ref={debugSceneRef}>
+        {debugInfo ? (
+          <DebugOverlayInternalWidgets debugInfo={debugInfo} />
+        ) : null}
+      </scene>
     </>
   );
 };
 
-// show provided textures as widgets on debug overlay (via createPortal)
-export const DebugOverlayWidgets: React.FC = React.memo(() => {
-  const debugScene = useContext(DebugOverlayContext);
-  const debugInfo = useContext(DebugContext);
+// show provided textures as widgets on debug overlay
+const DebugOverlayInternalWidgets: React.FC<{ debugInfo: DebugInfo }> =
+  React.memo(({ debugInfo }) => {
+    const { atlasTexture, outputTexture } = debugInfo;
 
-  if (!debugScene || !debugInfo) {
-    return null;
-  }
+    return (
+      <>
+        {outputTexture && (
+          <mesh position={[85, 85, 0]}>
+            <planeBufferGeometry attach="geometry" args={[20, 20]} />
+            <meshBasicMaterial
+              attach="material"
+              map={outputTexture}
+              toneMapped={false}
+            />
+          </mesh>
+        )}
 
-  const { atlasTexture, outputTexture } = debugInfo;
-
-  return (
-    <>
-      {createPortal(
-        <>
-          {outputTexture && (
-            <mesh position={[85, 85, 0]}>
-              <planeBufferGeometry attach="geometry" args={[20, 20]} />
-              <meshBasicMaterial
-                attach="material"
-                map={outputTexture}
-                toneMapped={false}
-              />
-            </mesh>
-          )}
-
-          {atlasTexture && (
-            <mesh position={[85, 64, 0]}>
-              <planeBufferGeometry attach="geometry" args={[20, 20]} />
-              <meshBasicMaterial
-                attach="material"
-                map={atlasTexture}
-                toneMapped={false}
-              />
-            </mesh>
-          )}
-        </>,
-        debugScene
-      )}
-    </>
-  );
-});
+        {atlasTexture && (
+          <mesh position={[85, 64, 0]}>
+            <planeBufferGeometry attach="geometry" args={[20, 20]} />
+            <meshBasicMaterial
+              attach="material"
+              map={atlasTexture}
+              toneMapped={false}
+            />
+          </mesh>
+        )}
+      </>
+    );
+  });

@@ -7,7 +7,7 @@ import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader';
 
 import Lightmap, { LightmapReadOnly } from '../core/Lightmap';
 import Spinner from './Spinner';
-import { DebugOverlayRenderer, DebugOverlayWidgets } from './DebugOverlayScene';
+import { DebugOverlayRenderer } from './DebugOverlayScene';
 
 import sceneUrl from './cylinder-smooth.glb';
 
@@ -69,8 +69,6 @@ export const Main: Story = () => (
           samplerSettings={{ offset: 0.05 }}
         >
           <MainSceneContents />
-
-          <DebugOverlayWidgets />
         </Lightmap>
       </React.Suspense>
     </DebugOverlayRenderer>

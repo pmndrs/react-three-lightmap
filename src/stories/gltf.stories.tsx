@@ -7,7 +7,7 @@ import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader';
 
 import Lightmap, { LightmapReadOnly } from '../core/Lightmap';
 import Spinner from './Spinner';
-import { DebugOverlayRenderer, DebugOverlayWidgets } from './DebugOverlayScene';
+import { DebugOverlayRenderer } from './DebugOverlayScene';
 
 import sceneUrl from './tile-game-room6.glb';
 
@@ -113,8 +113,6 @@ export const Main: Story = () => (
       <React.Suspense fallback={<Spinner />}>
         <Lightmap textureFilter={THREE.NearestFilter}>
           <MainSceneContents />
-
-          <DebugOverlayWidgets />
         </Lightmap>
       </React.Suspense>
     </DebugOverlayRenderer>

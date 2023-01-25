@@ -6,7 +6,7 @@ import * as THREE from 'three';
 
 import Lightmap from '../core/Lightmap';
 import Spinner from './Spinner';
-import { DebugOverlayRenderer, DebugOverlayWidgets } from './DebugOverlayScene';
+import { DebugOverlayRenderer } from './DebugOverlayScene';
 
 export default {
   title: 'Simple scene',
@@ -60,8 +60,6 @@ export const Main: Story = () => (
             position={[-2.5, 2.5, 4]}
             castShadow
           />
-
-          <DebugOverlayWidgets />
         </Lightmap>
       </React.Suspense>
     </DebugOverlayRenderer>

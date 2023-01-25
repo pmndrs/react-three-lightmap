@@ -6,7 +6,7 @@ import * as THREE from 'three';
 
 import Lightmap from '../core/Lightmap';
 import Spinner from './Spinner';
-import { DebugOverlayRenderer, DebugOverlayWidgets } from './DebugOverlayScene';
+import { DebugOverlayRenderer } from './DebugOverlayScene';
 
 export default {
   title: 'Multi-material mesh',
@@ -59,8 +59,6 @@ export const Main: Story = () => (
             <meshLambertMaterial attach="material-4" color="#ff00ff" />
             <meshLambertMaterial attach="material-5" color="#ffff00" />
           </mesh>
-
-          <DebugOverlayWidgets />
         </Lightmap>
       </React.Suspense>
     </DebugOverlayRenderer>

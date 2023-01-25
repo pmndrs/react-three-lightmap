@@ -6,7 +6,7 @@ import * as THREE from 'three';
 
 import Lightmap from '../core/Lightmap';
 import Spinner from './Spinner';
-import { DebugOverlayRenderer, DebugOverlayWidgets } from './DebugOverlayScene';
+import { DebugOverlayRenderer } from './DebugOverlayScene';
 
 export default {
   title: 'Simple AO',
@@ -42,8 +42,6 @@ export const Main: Story = () => (
 
           <pointLight color="#808080" position={[-3, 2, 5]} castShadow />
           <ambientLight color="#808080" />
-
-          <DebugOverlayWidgets />
         </Lightmap>
       </React.Suspense>
     </DebugOverlayRenderer>

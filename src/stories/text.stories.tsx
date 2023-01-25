@@ -6,7 +6,7 @@ import * as THREE from 'three';
 
 import Lightmap, { LightmapReadOnly } from '../core/Lightmap';
 import Spinner from './Spinner';
-import { DebugOverlayRenderer, DebugOverlayWidgets } from './DebugOverlayScene';
+import { DebugOverlayRenderer } from './DebugOverlayScene';
 
 export default {
   title: 'Text mesh scene',
@@ -66,8 +66,6 @@ const Scene: React.FC = () => {
         castShadow
       />
       <ambientLight color="#60656a" />
-
-      <DebugOverlayWidgets />
     </Lightmap>
   );
 };
