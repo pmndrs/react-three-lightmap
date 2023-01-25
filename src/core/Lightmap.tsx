@@ -3,7 +3,13 @@
  * Licensed under the MIT license
  */
 
-import React, { useState, useMemo, useLayoutEffect, useRef } from 'react';
+import React, {
+  useState,
+  useMemo,
+  useLayoutEffect,
+  useContext,
+  useRef
+} from 'react';
 import * as THREE from 'three';
 
 import { materialIsSupported } from './lightScene';
@@ -54,9 +60,13 @@ export interface DebugInfo {
   atlasTexture: THREE.Texture;
   outputTexture: THREE.Texture;
 }
-export const DebugContext = React.createContext<DebugInfo | null>(null);
+export const DebugContext = React.createContext<DebugInfo | null>(null); // @todo remove
 
-const DebugListenerContext = React.createContext<DebugListener | null>(null);
+const DebugListenerContext = React.createContext<DebugListener>({
+  // dummy methods
+  onAtlasMap() {},
+  onPassComplete() {}
+});
 
 // debug helper hook that returns current known debug state and context wrapper
 export function useLightmapDebug(): [
@@ -175,50 +185,8 @@ const Lightmap: React.FC<React.PropsWithChildren<LightmapProps>> = ({
   const onCompleteRef = useRef(onComplete);
   onCompleteRef.current = onComplete;
 
-  // debug helper
-  const [debugInfo, setDebugInfo] = useState<DebugInfo | null>(null);
-  const debug: DebugListener = {
-    onAtlasMap(atlasMap) {
-      // initialize debug display of atlas texture as well as blank placeholder for output
-      const atlasTexture = new THREE.DataTexture(
-        atlasMap.data,
-        atlasMap.width,
-        atlasMap.height,
-        THREE.RGBAFormat,
-        THREE.FloatType
-      );
-
-      const outputTexture = new THREE.DataTexture(
-        new Float32Array(atlasMap.width * atlasMap.height * 4),
-        atlasMap.width,
-        atlasMap.height,
-        THREE.RGBAFormat,
-        THREE.FloatType
-      );
-
-      setDebugInfo({
-        atlasTexture,
-        outputTexture
-      });
-    },
-    onPassComplete(data, width, height) {
-      setDebugInfo(
-        (prev) =>
-          prev && {
-            ...prev,
-
-            // replace with a new texture with copied source buffer data
-            outputTexture: new THREE.DataTexture(
-              new Float32Array(data),
-              width,
-              height,
-              THREE.RGBAFormat,
-              THREE.FloatType
-            )
-          }
-      );
-    }
-  };
+  // debug helper defined by parent
+  const debug = useContext(DebugListenerContext);
 
   // main offscreen workflow state
   const result = useOffscreenWorkflow(
@@ -257,15 +225,11 @@ const Lightmap: React.FC<React.PropsWithChildren<LightmapProps>> = ({
 
   // show final scene only when baking is done because it may contain loaded GLTF mesh instances
   // (which end up cached and reused, so only one scene can attach them at a time anyway)
-  return (
-    <DebugContext.Provider value={debugInfo}>
-      {result ? (
-        <scene name="Lightmap Result Scene" ref={sceneRef}>
-          {children}
-        </scene>
-      ) : null}
-    </DebugContext.Provider>
-  );
+  return result ? (
+    <scene name="Lightmap Result Scene" ref={sceneRef}>
+      {children}
+    </scene>
+  ) : null;
 };
 
 export default Lightmap;
