@@ -46,7 +46,7 @@ export const DebugOverlayRenderer: React.FC<{ children: React.ReactNode }> = ({
 };
 
 // show provided textures as widgets on debug overlay (via createPortal)
-export const DebugOverlayWidgets: React.FC = React.memo(() => {
+export const DebugOverlayWidgets: React.FC = React.memo(function DebugOverlayWidgets() {
   const debugScene = useContext(DebugOverlayContext);
   const debugInfo = useContext(DebugContext);
 

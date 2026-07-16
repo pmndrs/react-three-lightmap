@@ -11,12 +11,12 @@ const offDirX = [1, 1, 0, -1, -1, -1, 0, 1];
 const offDirY = [0, 1, 1, 1, 0, -1, -1, -1];
 
 function storeLightMapValue(
-  atlasData: Float32Array,
+  atlasData: Float32Array<ArrayBuffer>,
   atlasWidth: number,
   totalTexelCount: number,
   texelIndex: number,
   rgba: THREE.Vector4,
-  passOutputData: Float32Array
+  passOutputData: Float32Array<ArrayBuffer>
 ) {
   // read existing texel value (if adding)
   const mainOffTexelBase = texelIndex * 4;
@@ -57,7 +57,7 @@ export async function runBakingPasses(
   workbench: Workbench,
   requestWork: () => Promise<THREE.WebGLRenderer>,
   onDebugPassComplete?: (
-    outputData: Float32Array,
+    outputData: Float32Array<ArrayBuffer>,
     width: number,
     height: number
   ) => void

@@ -33,7 +33,7 @@ export const DEFAULT_LIGHT_PROBE_SETTINGS: LightProbeSettings = {
 };
 
 export type ProbeDataReport = {
-  rgbaData: Float32Array;
+  rgbaData: Float32Array<ArrayBuffer>;
   rowPixelStride: number;
   probeBox: THREE.Vector4;
   originX: number; // device coordinates of lower-left corner of the viewbox

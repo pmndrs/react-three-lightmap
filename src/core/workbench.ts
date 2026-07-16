@@ -16,7 +16,7 @@ export interface Workbench {
 
   // lightmap output
   irradiance: THREE.Texture;
-  irradianceData: Float32Array;
+  irradianceData: Float32Array<ArrayBuffer>;
 
   createOutputTexture: () => THREE.Texture;
 
@@ -92,7 +92,7 @@ function createRendererTexture(
   atlasWidth: number,
   atlasHeight: number,
   textureFilter: THREE.TextureFilter
-): [THREE.Texture, Float32Array] {
+): [THREE.Texture, Float32Array<ArrayBuffer>] {
   const atlasSize = atlasWidth * atlasHeight;
   const data = new Float32Array(4 * atlasSize);
 

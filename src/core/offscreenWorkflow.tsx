@@ -48,7 +48,11 @@ export type OffscreenSettings = WorkbenchSettings & {
 
 export interface Debug {
   onAtlasMap: (atlasMap: Workbench['atlasMap']) => void;
-  onPassComplete: (data: Float32Array, width: number, height: number) => void;
+  onPassComplete: (
+    data: Float32Array<ArrayBuffer>,
+    width: number,
+    height: number
+  ) => void;
 }
 
 // main async workflow, allows early cancellation via abortPromise

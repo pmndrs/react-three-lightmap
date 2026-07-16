@@ -16,7 +16,7 @@ export interface AtlasMap {
   width: number;
   height: number;
   items: AtlasMapItem[];
-  data: Float32Array;
+  data: Float32Array<ArrayBuffer>;
 }
 
 // must be black for full zeroing
