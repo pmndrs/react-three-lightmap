@@ -13,8 +13,8 @@
     "ambient occlusion",
     "ao-baker"
   ],
-  "main": "dist/index.js",
-  "module": "dist/lightmap.esm.js",
+  "main": "dist/entry.js",
+  "module": "dist/entry.mjs",
   "typings": "dist/entry.d.ts",
   "files": [
     "dist"
@@ -26,11 +26,11 @@
     "potpack": "^1.0.1"
   },
   "scripts": {
-    "start": "tsdx watch --entry src/entry.ts",
-    "build": "tsdx build --entry src/entry.ts",
+    "start": "tsup --watch",
+    "build": "tsup",
     "test": "tsdx test --passWithNoTests",
     "lint": "tsdx lint",
-    "prepare": "tsdx build --entry src/entry.ts",
+    "prepack": "npm run build",
     "size": "size-limit",
     "analyze": "size-limit --why",
     "storybook": "start-storybook -p 6006",
@@ -49,7 +49,7 @@
     "@babel/core": "^7.12.17",
     "@react-three/drei": "^9.0.0",
     "@react-three/fiber": "^8.0.0",
-    "@size-limit/preset-small-lib": "^4.9.2",
+    "@size-limit/preset-small-lib": "^12",
     "@storybook/addon-essentials": "^6.5.0",
     "@storybook/addon-info": "^5.3.21",
     "@storybook/addon-links": "^6.5.0",
@@ -64,10 +64,10 @@
     "react": "^18.0.0",
     "react-dom": "^18.0.0",
     "react-is": "^18.0.0",
-    "size-limit": "^4.9.2",
+    "size-limit": "^12",
     "three": "^0.128.0",
-    "tsdx": "^0.14.1",
     "tslib": "^2.1.0",
+    "tsup": "^8.5.1",
     "typescript": "^4.1.5"
   },
   "peerDependencies": {
@@ -82,11 +82,11 @@
   },
   "size-limit": [
     {
-      "path": "dist/lightmap.cjs.production.min.js",
+      "path": "dist/entry.js",
       "limit": "10 KB"
     },
     {
-      "path": "dist/lightmap.esm.js",
+      "path": "dist/entry.mjs",
       "limit": "10 KB"
     }
   ]
