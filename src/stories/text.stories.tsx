@@ -1,5 +1,5 @@
 import React from 'react';
-import { Story, Meta } from '@storybook/react';
+import { StoryFn, Meta } from '@storybook/react-vite';
 import { Canvas, useLoader } from '@react-three/fiber';
 import { OrbitControls } from '@react-three/drei';
 import * as THREE from 'three';
@@ -72,7 +72,7 @@ const Scene: React.FC = () => {
   );
 };
 
-export const Main: Story = () => (
+export const Main: StoryFn = () => (
   <Canvas
     camera={{ position: [2, -8, 1], up: [0, 0, 1] }}
     shadows

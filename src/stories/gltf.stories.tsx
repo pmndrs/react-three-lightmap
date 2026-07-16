@@ -1,5 +1,5 @@
-import React from 'react';
-import { Story, Meta } from '@storybook/react';
+import React, { useState } from 'react';
+import { StoryFn, Meta } from '@storybook/react-vite';
 import { useLoader, Canvas } from '@react-three/fiber';
 import { OrbitControls } from '@react-three/drei';
 import * as THREE from 'three';
@@ -8,6 +8,8 @@ import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader';
 import Lightmap, { LightmapReadOnly } from '../core/Lightmap';
 import Spinner from './Spinner';
 import { DebugOverlayRenderer, DebugOverlayWidgets } from './DebugOverlayScene';
+import BakeCompleteMarker from './BakeCompleteMarker';
+import { waitForBake } from './waitForBake';
 
 import sceneUrl from './tile-game-room6.glb';
 
@@ -98,32 +100,47 @@ const MainSceneContents: React.FC = () => {
   );
 };
 
-export const Main: Story = () => (
-  <Canvas
-    camera={{ position: [-4, -4, 8], up: [0, 0, 1] }}
-    shadows
-    onCreated={({ gl }) => {
-      gl.toneMapping = THREE.ACESFilmicToneMapping;
-      gl.toneMappingExposure = 0.9;
+export const Main: StoryFn = () => {
+  const [baked, setBaked] = useState(false);
 
-      gl.outputEncoding = THREE.sRGBEncoding;
-    }}
-  >
-    <DebugOverlayRenderer>
-      <React.Suspense fallback={<Spinner />}>
-        <Lightmap textureFilter={THREE.NearestFilter}>
-          <MainSceneContents />
+  return (
+    <>
+      <Canvas
+        camera={{ position: [-4, -4, 8], up: [0, 0, 1] }}
+        shadows
+        onCreated={({ gl }) => {
+          gl.toneMapping = THREE.ACESFilmicToneMapping;
+          gl.toneMappingExposure = 0.9;
 
-          <DebugOverlayWidgets />
-        </Lightmap>
-      </React.Suspense>
-    </DebugOverlayRenderer>
+          gl.outputEncoding = THREE.sRGBEncoding;
+        }}
+      >
+        <DebugOverlayRenderer>
+          <React.Suspense fallback={<Spinner />}>
+            <Lightmap
+              textureFilter={THREE.NearestFilter}
+              onComplete={() => setBaked(true)}
+            >
+              <MainSceneContents />
 
-    <OrbitControls
-      enableDamping
-      dampingFactor={0.1}
-      rotateSpeed={0.5}
-      target={new THREE.Vector3(0, 0, 1)}
-    />
-  </Canvas>
-);
+              <DebugOverlayWidgets />
+            </Lightmap>
+          </React.Suspense>
+        </DebugOverlayRenderer>
+
+        <OrbitControls
+          enableDamping
+          dampingFactor={0.1}
+          rotateSpeed={0.5}
+          target={new THREE.Vector3(0, 0, 1)}
+        />
+      </Canvas>
+
+      {baked && <BakeCompleteMarker />}
+    </>
+  );
+};
+
+Main.play = async ({ canvasElement }) => {
+  await waitForBake(canvasElement);
+};

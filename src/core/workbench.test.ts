@@ -16,13 +16,13 @@ describe('objectHasFlag', () => {
 
   it('is true once the flag is set in userData, regardless of value', () => {
     const object = new THREE.Object3D();
-    object.userData[LIGHTMAP_IGNORE_FLAG] = true;
+    object.userData = { [LIGHTMAP_IGNORE_FLAG]: true };
     expect(objectHasFlag(object, LIGHTMAP_IGNORE_FLAG)).toBe(true);
   });
 
   it('distinguishes between different flag symbols', () => {
     const object = new THREE.Object3D();
-    object.userData[LIGHTMAP_READONLY_FLAG] = true;
+    object.userData = { [LIGHTMAP_READONLY_FLAG]: true };
     expect(objectHasFlag(object, LIGHTMAP_READONLY_FLAG)).toBe(true);
     expect(objectHasFlag(object, LIGHTMAP_IGNORE_FLAG)).toBe(false);
   });
@@ -66,7 +66,7 @@ describe('traverseSceneItems', () => {
 
   it('skips objects flagged as lightmap-ignore, and calls onIgnored for them', () => {
     const { root, child, grandchild } = buildTree();
-    child.userData[LIGHTMAP_IGNORE_FLAG] = true;
+    child.userData = { [LIGHTMAP_IGNORE_FLAG]: true };
 
     const ignored: THREE.Object3D[] = [];
     const visited = [...traverseSceneItems(root, false, (o) => ignored.push(o))];
@@ -78,7 +78,7 @@ describe('traverseSceneItems', () => {
 
   it('only skips lightmap-readonly objects when ignoreReadOnly is true', () => {
     const { root, child, grandchild } = buildTree();
-    child.userData[LIGHTMAP_READONLY_FLAG] = true;
+    child.userData = { [LIGHTMAP_READONLY_FLAG]: true };
 
     const includingReadOnly = [...traverseSceneItems(root, false)];
     expect(new Set(includingReadOnly)).toEqual(

@@ -19,4 +19,6 @@ yarn-debug.log*
 yarn-error.log*
 .size-snapshot.json
 __tests__/__image_snapshots__/__diff_output__
+.storybook/__screenshots__/__diff_output__/
+.storybook/__screenshots__/__received_output__/
 .husky/_/

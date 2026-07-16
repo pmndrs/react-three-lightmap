@@ -1,5 +1,5 @@
 import React from 'react';
-import { Story, Meta } from '@storybook/react';
+import { StoryFn, Meta } from '@storybook/react-vite';
 import { Canvas } from '@react-three/fiber';
 import { OrbitControls } from '@react-three/drei';
 import * as THREE from 'three';
@@ -16,7 +16,7 @@ export default {
   decorators: [(story) => <div style={{ height: '100vh' }}>{story()}</div>]
 } as Meta;
 
-export const Main: Story = () => (
+export const Main: StoryFn = () => (
   <Canvas
     camera={{ position: [-6, -4, 2], up: [0, 0, 1] }}
     shadows

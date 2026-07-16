@@ -37,7 +37,8 @@
     "size": "size-limit",
     "analyze": "size-limit --why",
     "storybook": "storybook dev -p 6006",
-    "build-storybook": "storybook build"
+    "build-storybook": "storybook build",
+    "test-storybook": "test-storybook --testTimeout 90000"
   },
   "repository": {
     "type": "git",
@@ -54,6 +55,8 @@
     "@react-three/fiber": "^8.0.0",
     "@size-limit/preset-small-lib": "^12",
     "@storybook/react-vite": "^10",
+    "@storybook/test-runner": "^0.24.4",
+    "@types/jest-image-snapshot": "^6.4.1",
     "@types/react": "^18.0.0",
     "@types/react-dom": "^18.0.0",
     "@types/three": "^0.128.0",
@@ -62,6 +65,8 @@
     "eslint-plugin-react": "^7.37.5",
     "eslint-plugin-react-hooks": "^7.1.1",
     "husky": "^9",
+    "jest-image-snapshot": "^6.5.2",
+    "playwright": "^1.61.1",
     "prettier": "^2.5.1",
     "react": "^18.0.0",
     "react-dom": "^18.0.0",

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Story, Meta } from '@storybook/react';
+import { StoryFn, Meta } from '@storybook/react-vite';
 import { Canvas } from '@react-three/fiber';
 import { OrbitControls } from '@react-three/drei';
 import * as THREE from 'three';
@@ -29,7 +29,7 @@ export default {
   decorators: [(story) => <div style={{ height: '100vh' }}>{story()}</div>]
 } as Meta;
 
-type StoryWithArgs = Story<{ disabled: boolean }>;
+type StoryWithArgs = StoryFn<{ disabled: boolean }>;
 
 export const Main: StoryWithArgs = ({ disabled }) => (
   <Canvas

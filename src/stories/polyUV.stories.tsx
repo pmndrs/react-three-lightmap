@@ -1,5 +1,5 @@
-import React from 'react';
-import { Story, Meta } from '@storybook/react';
+import React, { useState } from 'react';
+import { StoryFn, Meta } from '@storybook/react-vite';
 import { Canvas } from '@react-three/fiber';
 import { OrbitControls } from '@react-three/drei';
 import * as THREE from 'three';
@@ -7,6 +7,8 @@ import * as THREE from 'three';
 import Lightmap, { LightmapReadOnly } from '../core/Lightmap';
 import Spinner from './Spinner';
 import { DebugOverlayRenderer, DebugOverlayWidgets } from './DebugOverlayScene';
+import BakeCompleteMarker from './BakeCompleteMarker';
+import { waitForBake } from './waitForBake';
 
 export default {
   title: 'Cylinder scene (polygon UV)',
@@ -16,48 +18,60 @@ export default {
   decorators: [(story) => <div style={{ height: '100vh' }}>{story()}</div>]
 } as Meta;
 
-export const Main: Story = () => (
-  <Canvas
-    camera={{ position: [-6, -4, 2], up: [0, 0, 1] }}
-    shadows
-    onCreated={({ gl }) => {
-      gl.toneMapping = THREE.ACESFilmicToneMapping;
-      gl.toneMappingExposure = 0.9;
+export const Main: StoryFn = () => {
+  const [baked, setBaked] = useState(false);
 
-      gl.outputEncoding = THREE.sRGBEncoding;
-    }}
-  >
-    <DebugOverlayRenderer>
-      <React.Suspense fallback={<Spinner />}>
-        <Lightmap texelsPerUnit={4}>
-          <LightmapReadOnly>
-            <mesh position={[0, 0, -2]} receiveShadow>
-              <planeBufferGeometry attach="geometry" args={[20, 20]} />
-              <meshLambertMaterial attach="material" color="#ffffff" />
-            </mesh>
-          </LightmapReadOnly>
+  return (
+    <>
+      <Canvas
+        camera={{ position: [-6, -4, 2], up: [0, 0, 1] }}
+        shadows
+        onCreated={({ gl }) => {
+          gl.toneMapping = THREE.ACESFilmicToneMapping;
+          gl.toneMappingExposure = 0.9;
 
-          <mesh position={[0, 0, 0]} castShadow receiveShadow>
-            <circleBufferGeometry attach="geometry" args={[2, 4]} />
-            <meshLambertMaterial attach="material" color="#c0c0c0" />
-          </mesh>
+          gl.outputEncoding = THREE.sRGBEncoding;
+        }}
+      >
+        <DebugOverlayRenderer>
+          <React.Suspense fallback={<Spinner />}>
+            <Lightmap texelsPerUnit={4} onComplete={() => setBaked(true)}>
+              <LightmapReadOnly>
+                <mesh position={[0, 0, -2]} receiveShadow>
+                  <planeBufferGeometry attach="geometry" args={[20, 20]} />
+                  <meshLambertMaterial attach="material" color="#ffffff" />
+                </mesh>
+              </LightmapReadOnly>
 
-          <directionalLight
-            intensity={1}
-            position={[-2.5, 2.5, 4]}
-            castShadow
-          />
+              <mesh position={[0, 0, 0]} castShadow receiveShadow>
+                <circleBufferGeometry attach="geometry" args={[2, 4]} />
+                <meshLambertMaterial attach="material" color="#c0c0c0" />
+              </mesh>
 
-          <DebugOverlayWidgets />
-        </Lightmap>
-      </React.Suspense>
-    </DebugOverlayRenderer>
+              <directionalLight
+                intensity={1}
+                position={[-2.5, 2.5, 4]}
+                castShadow
+              />
 
-    <OrbitControls
-      enableDamping
-      dampingFactor={0.1}
-      rotateSpeed={0.5}
-      target={new THREE.Vector3(0, 0, 1)}
-    />
-  </Canvas>
-);
+              <DebugOverlayWidgets />
+            </Lightmap>
+          </React.Suspense>
+        </DebugOverlayRenderer>
+
+        <OrbitControls
+          enableDamping
+          dampingFactor={0.1}
+          rotateSpeed={0.5}
+          target={new THREE.Vector3(0, 0, 1)}
+        />
+      </Canvas>
+
+      {baked && <BakeCompleteMarker />}
+    </>
+  );
+};
+
+Main.play = async ({ canvasElement }) => {
+  await waitForBake(canvasElement);
+};
