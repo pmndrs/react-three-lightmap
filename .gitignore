@@ -2,6 +2,7 @@ node_modules/
 coverage/
 dist/
 build/
+storybook-static/
 types/
 Thumbs.db
 ehthumbs.db
