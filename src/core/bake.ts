@@ -10,7 +10,7 @@ const MAX_PASSES = 2;
 const offDirX = [1, 1, 0, -1, -1, -1, 0, 1];
 const offDirY = [0, 1, 1, 1, 0, -1, -1, -1];
 
-function storeLightMapValue(
+export function storeLightMapValue(
   atlasData: Float32Array<ArrayBuffer>,
   atlasWidth: number,
   totalTexelCount: number,

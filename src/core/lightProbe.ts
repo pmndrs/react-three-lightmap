@@ -59,7 +59,7 @@ export type ProbeBatcher = (
 }>;
 
 // bilinear interpolation of normals in triangle, with normalization
-function setBlendedNormal(
+export function setBlendedNormal(
   out: THREE.Vector3,
   origNormalArray: ArrayLike<number>,
   origIndexArray: ArrayLike<number>,
@@ -88,7 +88,7 @@ function setBlendedNormal(
   out.normalize();
 }
 
-function setUpProbeUp(
+export function setUpProbeUp(
   probeCam: THREE.Camera,
   mesh: THREE.Mesh,
   origin: THREE.Vector3,
@@ -110,7 +110,7 @@ function setUpProbeUp(
   probeCam.applyMatrix4(mesh.matrixWorld);
 }
 
-function setUpProbeSide(
+export function setUpProbeSide(
   probeCam: THREE.Camera,
   mesh: THREE.Mesh,
   origin: THREE.Vector3,

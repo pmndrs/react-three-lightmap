@@ -22,7 +22,7 @@ const tmpVert = new THREE.Vector3();
 const tmpVert2 = new THREE.Vector3();
 const tmpNormal2 = new THREE.Vector3();
 
-function findVertex(
+export function findVertex(
   posArray: ArrayLike<number>,
   normalArray: ArrayLike<number>,
   groupIndexArray: ArrayLike<number>,
@@ -84,7 +84,7 @@ function convertGeometryToIndexed(buffer: THREE.BufferGeometry) {
   buffer.setIndex(indexAttr);
 }
 
-function guessOrthogonalOrigin(
+export function guessOrthogonalOrigin(
   indexArray: ArrayLike<number>,
   vStart: number,
   posArray: ArrayLike<number>
