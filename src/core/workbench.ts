@@ -44,9 +44,6 @@ export function objectHasFlag(object: THREE.Object3D, flag: symbol) {
   return hasOwnProp.call(object.userData, flag);
 }
 
-// hacky way to report current object flag while doing traverseSceneItems
-export let traversalStateIsReadOnly = false;
-
 // based on traverse() in https://github.com/mrdoob/three.js/blob/dev/src/core/Object3D.js
 export function* traverseSceneItems(
   root: THREE.Object3D,
@@ -76,8 +73,6 @@ export function* traverseSceneItems(
     const activeReadOnly =
       inheritReadOnly || objectHasFlag(current, LIGHTMAP_READONLY_FLAG);
 
-    // report to consumer
-    traversalStateIsReadOnly = activeReadOnly;
     yield current;
 
     // recurse, letting children inherit the active/inherited readOnly flag

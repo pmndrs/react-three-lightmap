@@ -3,18 +3,18 @@
  * Licensed under the MIT license
  */
 
-import React, { useState, useLayoutEffect, useRef } from 'react';
+import React, { useLayoutEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 
-import { materialIsSupported } from './lightScene';
+// side-effect-only: augments JSX.IntrinsicElements with r3f host elements (<scene>, <group>)
+import type {} from '@react-three/fiber';
+
 import {
-  traverseSceneItems,
-  WorkbenchSettings,
-  LIGHTMAP_READONLY_FLAG,
-  LIGHTMAP_IGNORE_FLAG
-} from './workbench';
-import { computeAutoUV2Layout } from './AutoUV2';
-import { useOffscreenWorkflow, Debug } from './offscreenWorkflow';
+  runOffscreenWorkflow,
+  Debug,
+  OffscreenSettings
+} from './offscreenWorkflow';
+import { LIGHTMAP_READONLY_FLAG, LIGHTMAP_IGNORE_FLAG } from './workbench';
 
 // prevent lightmap and UV2 generation for content
 // (but still allow contribution to lightmap, for e.g. emissive objects, large occluders, etc)
@@ -56,45 +56,7 @@ export interface DebugInfo {
 }
 export const DebugContext = React.createContext<DebugInfo | null>(null);
 
-// set the computed irradiance texture on real scene materials
-function updateFinalSceneMaterials(
-  scene: THREE.Scene,
-  irradiance: THREE.Texture,
-  aoMode: boolean
-) {
-  // process relevant meshes
-  for (const object of traverseSceneItems(scene, false)) {
-    // simple check for type (no need to check for uv2 presence)
-    if (!(object instanceof THREE.Mesh)) {
-      continue;
-    }
-
-    const mesh = object;
-
-    const materialList: (THREE.Material | null)[] = Array.isArray(mesh.material)
-      ? mesh.material
-      : [mesh.material];
-
-    // fill in the computed maps
-    materialList.forEach((material) => {
-      if (!material || !materialIsSupported(material)) {
-        return;
-      }
-
-      // set up our AO or lightmap as needed
-      if (aoMode) {
-        material.aoMap = irradiance;
-        material.needsUpdate = true;
-      } else {
-        material.lightMap = irradiance;
-        material.needsUpdate = true;
-      }
-    });
-  }
-}
-
-export type LightmapProps = WorkbenchSettings & {
-  workPerFrame?: number; // @todo allow fractions, dynamic value
+export type LightmapProps = OffscreenSettings & {
   disabled?: boolean;
   onComplete?: (result: THREE.Texture) => void;
 };
@@ -106,8 +68,13 @@ const Lightmap: React.FC<React.PropsWithChildren<LightmapProps>> = ({
   ...settings
 }) => {
   // track latest reference to onComplete callback
+  // (can't wrap this in a hook since the linter would complain if it doesn't see bare useRef)
   const onCompleteRef = useRef(onComplete);
   onCompleteRef.current = onComplete;
+
+  // track latest settings without re-triggering the bake effect
+  const settingsRef = useRef(settings);
+  settingsRef.current = settings;
 
   // debug helper
   const [debugInfo, setDebugInfo] = useState<DebugInfo | null>(null);
@@ -153,51 +120,67 @@ const Lightmap: React.FC<React.PropsWithChildren<LightmapProps>> = ({
       );
     }
   };
-
-  // main offscreen workflow state
-  const result = useOffscreenWorkflow(
-    disabled ? null : children,
-    settings,
-    debug
-  );
+  const debugRef = useRef(debug);
+  debugRef.current = debug;
 
   const sceneRef = useRef<THREE.Scene>(null);
 
+  // one-way latch: once "disabled" first goes falsy, "started" flips true and stays
+  // true, so the effect below fires its one-shot bake exactly once, regardless of how
+  // "disabled" is toggled afterwards - cleanup then only ever runs on actual unmount
+  const [started, setStarted] = useState(!disabled);
+  if (!disabled && !started) {
+    setStarted(true);
+  }
+
   useLayoutEffect(() => {
-    if (!result || !sceneRef.current) {
+    if (!started) {
       return;
     }
 
-    // create UV2 coordinates for the final scene meshes
-    // @todo somehow reuse ones from the baker?
-    computeAutoUV2Layout(
-      [result.atlasMap.width, result.atlasMap.height],
-      traverseSceneItems(sceneRef.current, true),
-      {
-        texelsPerUnit: result.texelsPerUnit
-      }
-    );
-
-    // copy texture data since this is coming from a foreign canvas
-    const texture = result.createOutputTexture();
-
-    updateFinalSceneMaterials(sceneRef.current, texture, result.aoMode);
-
-    // notify listener and pass the texture instance intended for parent GL context
-    if (onCompleteRef.current) {
-      onCompleteRef.current(texture);
+    const scene = sceneRef.current;
+    if (!scene) {
+      throw new Error('expecting lightmap scene');
     }
-  }, [result]);
 
-  // show final scene only when baking is done because it may contain loaded GLTF mesh instances
-  // (which end up cached and reused, so only one scene can attach them at a time anyway)
+    // set up abort signal promise
+    let abortResolver = () => undefined as void;
+    const abortPromise = new Promise<void>((resolve) => {
+      abortResolver = resolve;
+    });
+
+    runOffscreenWorkflow(
+      scene,
+      settingsRef.current,
+      abortPromise,
+      debugRef.current
+    ).then((result) => {
+      if (!result) {
+        return;
+      }
+
+      // the merged output mesh has already been reparented into this same live scene by
+      // runOffscreenWorkflow - just hide the individual sources it replaces
+      result.sourceMeshes.forEach((mesh) => {
+        mesh.visible = false;
+      });
+
+      if (onCompleteRef.current) {
+        onCompleteRef.current(result.outputTexture);
+      }
+    });
+
+    // on early unmount, resolve the abort signal promise
+    return () => {
+      abortResolver();
+    };
+  }, [started]);
+
   return (
     <DebugContext.Provider value={debugInfo}>
-      {result ? (
-        <scene name="Lightmap Result Scene" ref={sceneRef}>
-          {children}
-        </scene>
-      ) : null}
+      <scene name="Lightmap Scene" ref={sceneRef}>
+        {children}
+      </scene>
     </DebugContext.Provider>
   );
 };

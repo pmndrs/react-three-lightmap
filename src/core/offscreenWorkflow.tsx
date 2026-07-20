@@ -1,46 +1,10 @@
-/*
- * Copyright (c) 2021-now Nick Matantsev
- * Licensed under the MIT license
- */
-
-import React, { useState, useLayoutEffect, useRef } from 'react';
-import { useThree, createRoot } from '@react-three/fiber';
 import * as THREE from 'three';
 
-import { withLightScene } from './lightScene';
 import { initializeWorkbench, Workbench, WorkbenchSettings } from './workbench';
+import { buildBakeScene } from './bakeScene';
+import { materialIsSupported, stageLightSceneMaterials } from './lightScene';
 import { runBakingPasses } from './bake';
 import { createWorkManager } from './WorkManager';
-
-const WorkSceneWrapper: React.FC<{
-  onReady: (gl: THREE.WebGLRenderer, scene: THREE.Scene) => void;
-  children: React.ReactNode;
-}> = (props) => {
-  const { gl } = useThree(); // @todo use state selector
-
-  // track latest reference to onReady callback
-  const onReadyRef = useRef(props.onReady);
-  onReadyRef.current = props.onReady;
-
-  const sceneRef = useRef<THREE.Scene>(null);
-  useLayoutEffect(() => {
-    // kick off the asynchronous workflow process in the parent
-    // (this runs when scene content is loaded and suspensions are finished)
-    const scene = sceneRef.current;
-    if (!scene) {
-      throw new Error('expecting lightmap scene');
-    }
-
-    onReadyRef.current(gl, scene);
-  }, [gl]);
-
-  // main baking scene container
-  return (
-    <scene name="Lightmap Baking Scene" ref={sceneRef}>
-      {props.children}
-    </scene>
-  );
-};
 
 export type OffscreenSettings = WorkbenchSettings & {
   workPerFrame?: number; // @todo allow fractions, dynamic value
@@ -55,119 +19,99 @@ export interface Debug {
   ) => void;
 }
 
-// main async workflow, allows early cancellation via abortPromise
-async function runOffscreenWorkflow(
-  content: React.ReactNode,
+export interface BakeWorkflowResult {
+  mergedMesh: THREE.Mesh;
+  sourceMeshes: THREE.Mesh[];
+  outputTexture: THREE.Texture;
+  aoMode: boolean;
+}
+
+// orchestrates a single bake: collect+merge the live scene's contributing content into an
+// isolated bake scene (buildBakeScene), run the existing UV2/atlas/light-probe pipeline
+// against it with a dedicated, throwaway WebGLRenderer (no second React root anywhere),
+// then reparent the same merged mesh - now carrying baked UV2 + lightmap - into the live
+// scene. Returns null when there is nothing to bake (only read-only/ignored content present).
+export async function runOffscreenWorkflow(
+  liveScene: THREE.Scene,
   settings: OffscreenSettings,
   abortPromise: Promise<void>,
   debugListeners?: Debug
-) {
-  // render hidden canvas with the given content, wait for suspense to finish loading inside it
-  const scenePromise = await new Promise<{
-    gl: THREE.WebGLRenderer;
-    scene: THREE.Scene;
-  }>((resolve) => {
-    // just sensible small canvas, not actually used for direct output
-    const canvas = document.createElement('canvas');
-    canvas.width = 64;
-    canvas.height = 64;
+): Promise<BakeWorkflowResult | null> {
+  const bakeSceneResult = buildBakeScene(liveScene);
+  if (!bakeSceneResult) {
+    return null;
+  }
 
-    const root = createRoot(canvas).configure({
-      frameloop: 'never', // framebuffer target rendering is inside own RAF loop
-      shadows: true // @todo use the original GL context settings
-    });
+  const { bakeScene, mergedMesh, materials, sourceMeshes } = bakeSceneResult;
 
-    root.render(
-      <React.Suspense fallback={null}>
-        <WorkSceneWrapper
-          onReady={(gl, scene) => {
-            resolve({ gl, scene });
-          }}
-        >
-          {content}
-        </WorkSceneWrapper>
-      </React.Suspense>
+  // dedicated, throwaway canvas + renderer for the isolated bake render passes - never
+  // attached to the DOM, never a React root, disposed (with the canvas) once baking finishes
+  const canvas = document.createElement('canvas');
+  canvas.width = 64;
+  canvas.height = 64;
+
+  const gl = new THREE.WebGLRenderer({ canvas, antialias: false });
+  gl.shadowMap.enabled = true; // @todo mirror the live canvas's actual GL/shadow settings
+
+  try {
+    const requestWork = createWorkManager(
+      gl,
+      abortPromise,
+      settings.workPerFrame
     );
-  });
 
-  // preempt any further logic if already aborted
-  const { gl, scene } = await Promise.race([
-    scenePromise,
-    abortPromise.then(() => {
-      throw new Error('aborted before scene is complete');
-    })
-  ]);
+    const workbench = await initializeWorkbench(
+      bakeScene,
+      settings,
+      requestWork
+    );
+    debugListeners?.onAtlasMap(workbench.atlasMap);
 
-  // our own work manager (which is aware of the abort signal promise)
-  const requestWork = createWorkManager(
-    gl,
-    abortPromise,
-    settings.workPerFrame
-  );
+    await stageLightSceneMaterials(
+      workbench,
+      mergedMesh,
+      materials,
+      async () => {
+        await runBakingPasses(workbench, requestWork, (data, width, height) => {
+          debugListeners?.onPassComplete(data, width, height);
+        });
+      }
+    );
 
-  const workbench = await initializeWorkbench(scene, settings, requestWork);
-  debugListeners?.onAtlasMap(workbench.atlasMap); // expose atlas map for debugging
+    // build final materials - clone each original rather than mutating the shared
+    // instance, since it may still be referenced elsewhere (e.g. read-only content)
+    const outputTexture = workbench.createOutputTexture();
 
-  await withLightScene(workbench, async () => {
-    await runBakingPasses(workbench, requestWork, (data, width, height) => {
-      // expose current pass output for debugging
-      debugListeners?.onPassComplete(data, width, height);
-    });
-  });
+    const finalMaterials = materials.map((material) => {
+      if (!materialIsSupported(material)) {
+        return material;
+      }
 
-  return workbench;
-}
-
-// hook lifecycle for offscreen workflow
-export function useOffscreenWorkflow(
-  content: React.ReactNode | null | undefined,
-  settings?: OffscreenSettings,
-  debugListeners?: Debug
-) {
-  // track the first reference to non-empty content
-  const initialUsefulContentRef = useRef(content);
-  initialUsefulContentRef.current = initialUsefulContentRef.current || content;
-
-  // wrap latest value in ref to avoid triggering effect
-  const settingsRef = useRef(settings);
-  settingsRef.current = settings;
-
-  const debugRef = useRef(debugListeners);
-  debugRef.current = debugListeners;
-
-  const [result, setResult] = useState<Workbench | null>(null);
-
-  useLayoutEffect(() => {
-    // @todo check if this runs multiple times on some React versions???
-    const children = initialUsefulContentRef.current;
-    const settings = settingsRef.current;
-
-    // set up abort signal promise
-    let abortResolver = () => undefined as void;
-    const abortPromise = new Promise<void>((resolve) => {
-      abortResolver = resolve;
+      const finalMaterial = material.clone();
+      if (workbench.aoMode) {
+        finalMaterial.aoMap = outputTexture;
+      } else {
+        finalMaterial.lightMap = outputTexture;
+      }
+      finalMaterial.needsUpdate = true;
+      return finalMaterial;
     });
 
-    // run main logic with the abort signal promise
-    if (children) {
-      const workflowResult = runOffscreenWorkflow(
-        children,
-        settings ?? {},
-        abortPromise,
-        debugRef.current
-      );
+    mergedMesh.material = finalMaterials;
 
-      workflowResult.then((result) => {
-        setResult(result);
-      });
-    }
+    // reparent the same mesh/geometry object into the live scene
+    bakeScene.remove(mergedMesh);
+    liveScene.add(mergedMesh);
 
-    // on early unmount, resolve the abort signal promise
-    return () => {
-      abortResolver();
+    return {
+      mergedMesh,
+      sourceMeshes,
+      outputTexture,
+      aoMode: workbench.aoMode
     };
-  }, [initialUsefulContentRef.current]);
-
-  // @todo clean up for direct consumption
-  return result;
+  } finally {
+    // if successful, mergedMesh has already been reparented out of bakeScene by this point
+    bakeSceneResult.dispose();
+    gl.dispose();
+  }
 }
