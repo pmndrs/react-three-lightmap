@@ -4,7 +4,6 @@ import { collectMergePieces, mergePieces } from './mergeScene';
 import {
   LIGHTMAP_IGNORE_FLAG,
   LIGHTMAP_READONLY_FLAG,
-  objectHasFlag,
   traverseSceneItems
 } from './workbench';
 
@@ -30,31 +29,16 @@ function flattenWorldTransform(source: THREE.Object3D, target: THREE.Object3D) {
   target.scale.copy(tmpScale);
 }
 
-// Object3D.copy() JSON-round-trips userData, which silently drops our Symbol-keyed flags -
-// re-stamp them from the original onto the clone, walking both trees in lockstep
-function cloneSymbolFlags(source: THREE.Object3D, clone: THREE.Object3D) {
-  if (objectHasFlag(source, LIGHTMAP_READONLY_FLAG)) {
-    clone.userData = { ...clone.userData, [LIGHTMAP_READONLY_FLAG]: true };
-  }
-  if (objectHasFlag(source, LIGHTMAP_IGNORE_FLAG)) {
-    clone.userData = { ...clone.userData, [LIGHTMAP_IGNORE_FLAG]: true };
-  }
-
-  for (let i = 0; i < source.children.length; i += 1) {
-    cloneSymbolFlags(source.children[i], clone.children[i]);
-  }
-}
-
 // finds the top-most LightmapReadOnly-flagged node in each subtree - does not descend
 // past it, since .clone(true) below grabs everything beneath it in one shot
 function collectReadOnlyRoots(root: THREE.Object3D): THREE.Object3D[] {
   const roots: THREE.Object3D[] = [];
 
   function visit(object: THREE.Object3D) {
-    if (!object.visible || objectHasFlag(object, LIGHTMAP_IGNORE_FLAG)) {
+    if (!object.visible || object.userData[LIGHTMAP_IGNORE_FLAG]) {
       return;
     }
-    if (objectHasFlag(object, LIGHTMAP_READONLY_FLAG)) {
+    if (object.userData[LIGHTMAP_READONLY_FLAG]) {
       roots.push(object);
       return;
     }
@@ -102,7 +86,6 @@ export function buildBakeScene(
 
   for (const readOnlyRoot of readOnlyRoots) {
     const clone = readOnlyRoot.clone(true);
-    cloneSymbolFlags(readOnlyRoot, clone);
     flattenWorldTransform(readOnlyRoot, clone);
     bakeScene.add(clone);
   }

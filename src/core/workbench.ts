@@ -36,13 +36,8 @@ const DEFAULT_EMISSIVE_MULTIPLIER = 32;
 // flags for marking up objects in scene
 // read-only flag allows preventing UV2 generation but can also allow objects that have UV2 and should be
 // in light scene, but are ignored in atlas and have their own lightmap
-export const LIGHTMAP_IGNORE_FLAG = Symbol('lightmap ignore flag');
-export const LIGHTMAP_READONLY_FLAG = Symbol('lightmap read-only flag');
-
-const hasOwnProp = Object.prototype.hasOwnProperty;
-export function objectHasFlag(object: THREE.Object3D, flag: symbol) {
-  return hasOwnProp.call(object.userData, flag);
-}
+export const LIGHTMAP_IGNORE_FLAG = 'LIGHTMAP_ignore';
+export const LIGHTMAP_READONLY_FLAG = 'LIGHTMAP_readOnly';
 
 // based on traverse() in https://github.com/mrdoob/three.js/blob/dev/src/core/Object3D.js
 export function* traverseSceneItems(
@@ -60,8 +55,8 @@ export function* traverseSceneItems(
     // skip everything invisible and inside opt-out wrappers
     if (
       !current.visible ||
-      objectHasFlag(current, LIGHTMAP_IGNORE_FLAG) ||
-      (ignoreReadOnly && objectHasFlag(current, LIGHTMAP_READONLY_FLAG))
+      current.userData[LIGHTMAP_IGNORE_FLAG] ||
+      (ignoreReadOnly && current.userData[LIGHTMAP_READONLY_FLAG])
     ) {
       if (onIgnored) {
         onIgnored(current);
@@ -71,7 +66,7 @@ export function* traverseSceneItems(
 
     // compute readOnly flag for current object (either directly flagged or inheriting parent's flag)
     const activeReadOnly =
-      inheritReadOnly || objectHasFlag(current, LIGHTMAP_READONLY_FLAG);
+      inheritReadOnly || current.userData[LIGHTMAP_READONLY_FLAG];
 
     yield current;
 

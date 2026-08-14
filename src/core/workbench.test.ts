@@ -4,29 +4,8 @@ import { describe, expect, it } from 'vitest';
 import {
   LIGHTMAP_IGNORE_FLAG,
   LIGHTMAP_READONLY_FLAG,
-  objectHasFlag,
   traverseSceneItems
 } from './workbench';
-
-describe('objectHasFlag', () => {
-  it('is false when the flag is not set', () => {
-    const object = new THREE.Object3D();
-    expect(objectHasFlag(object, LIGHTMAP_IGNORE_FLAG)).toBe(false);
-  });
-
-  it('is true once the flag is set in userData, regardless of value', () => {
-    const object = new THREE.Object3D();
-    object.userData = { [LIGHTMAP_IGNORE_FLAG]: true };
-    expect(objectHasFlag(object, LIGHTMAP_IGNORE_FLAG)).toBe(true);
-  });
-
-  it('distinguishes between different flag symbols', () => {
-    const object = new THREE.Object3D();
-    object.userData = { [LIGHTMAP_READONLY_FLAG]: true };
-    expect(objectHasFlag(object, LIGHTMAP_READONLY_FLAG)).toBe(true);
-    expect(objectHasFlag(object, LIGHTMAP_IGNORE_FLAG)).toBe(false);
-  });
-});
 
 describe('traverseSceneItems', () => {
   function buildTree() {

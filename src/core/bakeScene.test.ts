@@ -2,11 +2,7 @@ import * as THREE from 'three';
 import { describe, expect, it } from 'vitest';
 
 import { buildBakeScene } from './bakeScene';
-import {
-  LIGHTMAP_IGNORE_FLAG,
-  LIGHTMAP_READONLY_FLAG,
-  objectHasFlag
-} from './workbench';
+import { LIGHTMAP_IGNORE_FLAG, LIGHTMAP_READONLY_FLAG } from './workbench';
 
 function makeTriangleGeometry() {
   const geometry = new THREE.BufferGeometry();
@@ -73,9 +69,8 @@ describe('buildBakeScene', () => {
     expect(clonedRoot).toBeDefined();
     expect(clonedRoot).not.toBe(readOnlyGroup);
 
-    // this is the exact bug: Object3D.copy() JSON-round-trips userData and silently
-    // drops Symbol-keyed properties, so this assertion fails without the fixup pass
-    expect(objectHasFlag(clonedRoot!, LIGHTMAP_READONLY_FLAG)).toBe(true);
+    // string-keyed flags survive Object3D.copy()'s userData JSON round-trip
+    expect(clonedRoot!.userData[LIGHTMAP_READONLY_FLAG]).toBe(true);
 
     // the read-only mesh itself was cloned too (deep clone)
     expect(clonedRoot!.children).toHaveLength(1);
