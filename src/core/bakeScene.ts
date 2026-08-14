@@ -115,12 +115,8 @@ export function buildBakeScene(
     sourceMeshes: merged.sourceMeshes,
 
     dispose() {
-      // deliberately do NOT call .dispose() on any geometry/material/texture here: clone
-      // geometries and original materials are shared by reference with the live scene, and
-      // three.js disposal has no ref-counting, so disposing a shared resource here would
-      // silently break the live scene. The bake's own dedicated WebGLRenderer/canvas gets
-      // thrown away right after this call, which frees all GPU resources tied to it
-      // (including compiled staging-material programs) regardless of per-object disposal.
+      // deliberately do NOT call .dispose() on any geometry/material/texture here
+      // to avoid accidentally disposing of eg textures
       bakeScene.clear();
     }
   };

@@ -20,13 +20,13 @@ export function materialIsSupported(
 
 function buildStagingMaterial(
   workbench: Workbench,
-  material: THREE.Material | null,
+  material: THREE.Material,
   isReadOnly: boolean
-): THREE.Material | null {
+): THREE.Material {
   const { aoMode, emissiveMultiplier, bounceMultiplier, irradiance } =
     workbench;
 
-  if (!material || !materialIsSupported(material)) {
+  if (!materialIsSupported(material)) {
     return material;
   }
 
@@ -118,11 +118,6 @@ function buildStagingMaterial(
   return stagingMaterial;
 }
 
-// set up baking-friendly materials on the (throwaway) bake scene: the merged mesh gets
-// writable staging materials wired to the in-progress irradiance texture, read-only clone
-// content gets staging materials that keep their own pre-existing AO/lightmap. The whole
-// bake scene is disposed wholesale after baking; the only real cleanup is the ephemeral AO
-// ambient light and suppressed visibility.
 export async function stageLightSceneMaterials(
   workbench: Workbench,
   mergedMesh: THREE.Mesh,
@@ -131,33 +126,27 @@ export async function stageLightSceneMaterials(
 ) {
   const { aoMode, lightScene } = workbench;
 
-  // stage the merged mesh's writable materials, index-aligned with its geometry .groups
-  // (materials is never-null by construction - see mergeScene.ts - so the cast is safe)
   mergedMesh.material = materials.map((material) =>
     buildStagingMaterial(workbench, material, false)
-  ) as THREE.Material[];
+  );
 
-  // stage read-only clone content (contributes occlusion/bounce, keeps its own maps);
-  // everything else found here (besides the merged mesh itself) is, by construction,
-  // part of a LightmapReadOnly-cloned subtree - see bakeScene.ts's buildBakeScene
-  const suppressedCleanupList: THREE.Object3D[] = [];
+  const suppressedList: THREE.Object3D[] = [];
 
-  for (const object of traverseSceneItems(
-    lightScene,
-    false,
-    (ignoredObject) => {
-      // also prevent ignored items from rendering
-      // (do nothing if already invisible to avoid setting it back to visible on cleanup)
-      if (ignoredObject.visible) {
-        ignoredObject.visible = false;
-        suppressedCleanupList.push(ignoredObject);
-      }
+  const onIgnored = (ignoredObject: THREE.Object3D) => {
+    if (!ignoredObject.visible) {
+      return;
     }
-  )) {
+
+    // also prevent ignored items from rendering
+    ignoredObject.visible = false;
+    suppressedList.push(ignoredObject);
+  };
+
+  for (const object of traverseSceneItems(lightScene, false, onIgnored)) {
     // hide any visible lights to prevent interfering with AO
-    if (aoMode && object instanceof THREE.Light) {
+    if (aoMode && object instanceof THREE.Light && object.visible) {
       object.visible = false;
-      suppressedCleanupList.push(object);
+      suppressedList.push(object);
       continue;
     }
 
@@ -170,8 +159,8 @@ export async function stageLightSceneMaterials(
       ? mesh.material
       : [mesh.material];
 
-    const stagingMaterialList = materialList.map((material) =>
-      buildStagingMaterial(workbench, material, true)
+    const stagingMaterialList = materialList.map(
+      (material) => material && buildStagingMaterial(workbench, material, true)
     );
 
     mesh.material = Array.isArray(mesh.material)
@@ -196,8 +185,8 @@ export async function stageLightSceneMaterials(
       lightScene.remove(aoSceneLight);
     }
 
-    // re-enable suppressed items (and lights if AO)
-    suppressedCleanupList.forEach((object) => {
+    // re-enable suppressed items and lights
+    suppressedList.forEach((object) => {
       object.visible = true;
     });
   }

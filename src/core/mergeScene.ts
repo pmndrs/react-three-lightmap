@@ -7,7 +7,7 @@ import { traverseSceneItems } from './workbench';
 // exactly as the source was: genuinely indexed sources like GLTF imports keep their
 // exporter-provided vertex sharing, while genuinely non-indexed sources like CSG output
 // end up with every vertex unique
-export interface MergePiece {
+export interface MeshMaterialPart {
   geometry: THREE.BufferGeometry;
   material: THREE.Material;
   sourceMesh: THREE.Mesh;
@@ -24,7 +24,7 @@ const tmpVec3 = new THREE.Vector3();
 // splits one mesh's geometry into one indexed, world-space piece per material group
 // (defaulting to a single group covering the whole mesh if it has none), so that later
 // merging can concatenate pieces via BufferGeometryUtils without losing per-source materials
-export function splitMeshIntoPieces(mesh: THREE.Mesh): MergePiece[] {
+export function splitMeshIntoPieces(mesh: THREE.Mesh): MeshMaterialPart[] {
   const geometry = mesh.geometry;
   if (!(geometry instanceof THREE.BufferGeometry)) {
     throw new Error('expected buffer geometry');
@@ -55,7 +55,7 @@ export function splitMeshIntoPieces(mesh: THREE.Mesh): MergePiece[] {
 
   const normalMatrix = new THREE.Matrix3().getNormalMatrix(mesh.matrixWorld);
 
-  const pieces: MergePiece[] = [];
+  const pieces: MeshMaterialPart[] = [];
 
   for (const group of groups) {
     const count = Math.min(group.count, vertexCount - group.start);
@@ -137,10 +137,10 @@ export function splitMeshIntoPieces(mesh: THREE.Mesh): MergePiece[] {
 
 // walks the live mount (same ignoreReadOnly=true traversal already used for UV2/atlas
 // computation) and splits every contributing mesh into merge pieces
-export function collectMergePieces(root: THREE.Object3D): MergePiece[] {
+export function collectMergePieces(root: THREE.Object3D): MeshMaterialPart[] {
   root.updateMatrixWorld(true);
 
-  const pieces: MergePiece[] = [];
+  const pieces: MeshMaterialPart[] = [];
   for (const object of traverseSceneItems(root, true)) {
     if (!(object instanceof THREE.Mesh)) {
       continue;
@@ -153,8 +153,7 @@ export function collectMergePieces(root: THREE.Object3D): MergePiece[] {
 
 // concatenates pieces into one indexed BufferGeometry via three.js's own geometry-merge
 // utility, with one .groups entry per piece (useGroups=true) - so per-source materials
-// stay addressable by group/material index exactly the way three.js multi-material
-// meshes already work.
+// stay addressable by group/material index.
 //
 // uv2 (lightmap UV) is only carried through when *every* piece brought its own
 // pre-existing uv2 - matching AutoUV2.tsx's own all-or-nothing "hasPredefinedUV2"
@@ -163,13 +162,17 @@ export function collectMergePieces(root: THREE.Object3D): MergePiece[] {
 // regeneration for everyone, same as mixing bare and pre-UV2'd meshes always has.
 // (mergeBufferGeometries() itself requires every input to expose the same attribute
 // set, which is exactly why the inconsistent case has to be resolved before calling it.)
-export function mergePieces(pieces: MergePiece[]): MergedSceneResult | null {
+export function mergePieces(
+  pieces: MeshMaterialPart[]
+): MergedSceneResult | null {
   if (pieces.length === 0) {
     return null;
   }
 
-  const preserveUv2 = pieces.every((piece) => piece.geometry.hasAttribute('uv2'));
-  if (!preserveUv2) {
+  const allHaveUV2 = pieces.every((piece) =>
+    piece.geometry.hasAttribute('uv2')
+  );
+  if (!allHaveUV2) {
     pieces.forEach((piece) => piece.geometry.deleteAttribute('uv2'));
   }
 
