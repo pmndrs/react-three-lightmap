@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { describe, expect, it } from 'vitest';
+import { mergeBufferGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils';
 
 import {
   collectMergePieces,
@@ -191,8 +192,8 @@ describe('splitMeshIntoPieces', () => {
     expect(indicesOf(piece.geometry)).toEqual([0, 1, 2, 0, 2, 3]);
   });
 
-  it('does not share vertices across a non-indexed source (nothing to preserve)', () => {
-    // two triangles, non-indexed, no natural sharing in the source
+  it('welds identical vertices of a non-indexed source (e.g. CSG output)', () => {
+    // quad as two non-indexed triangles, duplicating the shared diagonal
     const geometry = new THREE.BufferGeometry();
     geometry.setAttribute(
       'position',
@@ -211,9 +212,24 @@ describe('splitMeshIntoPieces', () => {
 
     const [piece] = splitMeshIntoPieces(mesh);
 
-    // no index on the source, so every vertex stays its own entry despite duplicate positions
+    expect(piece.geometry.attributes.position.count).toBe(4);
+    expect(indicesOf(piece.geometry)).toEqual([0, 1, 2, 0, 2, 3]);
+  });
+
+  it('keeps coincident non-indexed vertices separate when their normals differ (hard edge)', () => {
+    const geometry = makeTriangleGeometry().toNonIndexed();
+    const flipped = makeTriangleGeometry();
+    flipped.attributes.normal.setXYZ(0, 0, 0, -1);
+    flipped.attributes.normal.setXYZ(1, 0, 0, -1);
+    flipped.attributes.normal.setXYZ(2, 0, 0, -1);
+    const merged = mergeBufferGeometries([geometry, flipped])!;
+
+    const mesh = new THREE.Mesh(merged, new THREE.MeshStandardMaterial());
+    mesh.updateMatrixWorld(true);
+
+    const [piece] = splitMeshIntoPieces(mesh);
+
     expect(piece.geometry.attributes.position.count).toBe(6);
-    expect(indicesOf(piece.geometry)).toEqual([0, 1, 2, 3, 4, 5]);
   });
 });
 

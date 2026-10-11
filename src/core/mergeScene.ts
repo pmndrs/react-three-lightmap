@@ -3,10 +3,10 @@ import { mergeBufferGeometries } from 'three/examples/jsm/utils/BufferGeometryUt
 
 import { traverseSceneItems } from './workbench';
 
-// one material group's worth of world-space geometry, already indexed and de-duplicated
-// exactly as the source was: genuinely indexed sources like GLTF imports keep their
-// exporter-provided vertex sharing, while genuinely non-indexed sources like CSG output
-// end up with every vertex unique
+// one material group's worth of world-space geometry, already indexed and de-duplicated:
+// genuinely indexed sources like GLTF imports keep their exporter-provided vertex sharing,
+// while genuinely non-indexed sources like CSG output get identical vertices welded, so
+// that adjacent faces form shared UV2 layout islands
 export interface MeshMaterialPart {
   geometry: THREE.BufferGeometry;
   material: THREE.Material;
@@ -20,6 +20,18 @@ export interface MergedSceneResult {
 }
 
 const tmpVec3 = new THREE.Vector3();
+
+type VertexAttribute = THREE.BufferAttribute | THREE.InterleavedBufferAttribute;
+
+function getVertexKey(attributes: VertexAttribute[], index: number) {
+  const values: number[] = [];
+  for (const attribute of attributes) {
+    values.push(attribute.getX(index));
+    if (attribute.itemSize > 1) values.push(attribute.getY(index));
+    if (attribute.itemSize > 2) values.push(attribute.getZ(index));
+  }
+  return values.join(',');
+}
 
 // splits one mesh's geometry into one indexed, world-space piece per material group
 // (defaulting to a single group covering the whole mesh if it has none), so that later
@@ -42,6 +54,9 @@ export function splitMeshIntoPieces(mesh: THREE.Mesh): MeshMaterialPart[] {
   }
 
   const indexAttr = geometry.index;
+  const weldAttributes = [posAttr, normalAttr, uvAttr, uv2Attr].filter(
+    (attribute) => attribute
+  ) as VertexAttribute[];
   const vertexCount = indexAttr ? indexAttr.count : posAttr.count;
 
   const groups =
@@ -63,11 +78,9 @@ export function splitMeshIntoPieces(mesh: THREE.Mesh): MeshMaterialPart[] {
       continue;
     }
 
-    // dedupe by *source* vertex index within this piece, so any sharing the source
-    // geometry already had (e.g. a GLTF exporter's own indexing) is preserved rather
-    // than lost - for a non-indexed source, srcIndex is unique per iteration anyway,
-    // so this naturally degrades to "every vertex is its own entry"
-    const localIndexBySrc = new Map<number, number>();
+    // indexed sources dedupe by source vertex index (keeping the exporter's own sharing),
+    // non-indexed sources dedupe by exact attribute values (welding coincident vertices)
+    const localIndexBySrc = new Map<number | string, number>();
     const positions: number[] = [];
     const normals: number[] = [];
     const uvs: number[] = [];
@@ -79,10 +92,14 @@ export function splitMeshIntoPieces(mesh: THREE.Mesh): MeshMaterialPart[] {
         ? indexAttr.getX(group.start + i)
         : group.start + i;
 
-      let localIndex = localIndexBySrc.get(srcIndex);
+      const srcKey = indexAttr
+        ? srcIndex
+        : getVertexKey(weldAttributes, srcIndex);
+
+      let localIndex = localIndexBySrc.get(srcKey);
       if (localIndex === undefined) {
         localIndex = positions.length / 3;
-        localIndexBySrc.set(srcIndex, localIndex);
+        localIndexBySrc.set(srcKey, localIndex);
 
         tmpVec3.fromBufferAttribute(posAttr, srcIndex);
         tmpVec3.applyMatrix4(mesh.matrixWorld);
