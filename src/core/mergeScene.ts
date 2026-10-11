@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { BufferGeometryUtils } from 'three/examples/jsm/utils/BufferGeometryUtils';
+import { mergeBufferGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils';
 
 import { traverseSceneItems } from './workbench';
 
@@ -176,7 +176,7 @@ export function mergePieces(
     pieces.forEach((piece) => piece.geometry.deleteAttribute('uv2'));
   }
 
-  const geometry = BufferGeometryUtils.mergeBufferGeometries(
+  const geometry = mergeBufferGeometries(
     pieces.map((piece) => piece.geometry),
     true
   );

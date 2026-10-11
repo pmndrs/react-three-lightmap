@@ -59,7 +59,7 @@
     "@types/jest-image-snapshot": "^6.4.1",
     "@types/react": "^18.0.0",
     "@types/react-dom": "^18.0.0",
-    "@types/three": "^0.128.0",
+    "@types/three": "^0.151.0",
     "eslint": "^9.39.5",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-react": "^7.37.5",
@@ -73,7 +73,7 @@
     "react-is": "^18.0.0",
     "size-limit": "^12",
     "storybook": "^10",
-    "three": "^0.128.0",
+    "three": "^0.151.3",
     "tslib": "^2.1.0",
     "tsup": "^8.5.1",
     "typescript": "^5.9.3",
@@ -84,7 +84,7 @@
   "peerDependencies": {
     "@react-three/fiber": ">=8.0.0",
     "react": ">=16",
-    "three": ">=0.128.0"
+    "three": ">=0.151.0"
   },
   "size-limit": [
     {

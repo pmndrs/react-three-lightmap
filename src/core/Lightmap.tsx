@@ -56,6 +56,22 @@ export interface DebugInfo {
 }
 export const DebugContext = React.createContext<DebugInfo | null>(null);
 
+function createFloatTexture(
+  data: Float32Array<ArrayBuffer>,
+  width: number,
+  height: number
+) {
+  const texture = new THREE.DataTexture(
+    data,
+    width,
+    height,
+    THREE.RGBAFormat,
+    THREE.FloatType
+  );
+  texture.needsUpdate = true;
+  return texture;
+}
+
 export type LightmapProps = OffscreenSettings & {
   disabled?: boolean;
   onComplete?: (result: THREE.Texture) => void;
@@ -81,20 +97,16 @@ const Lightmap: React.FC<React.PropsWithChildren<LightmapProps>> = ({
   const debug: Debug = {
     onAtlasMap(atlasMap) {
       // initialize debug display of atlas texture as well as blank placeholder for output
-      const atlasTexture = new THREE.DataTexture(
+      const atlasTexture = createFloatTexture(
         atlasMap.data,
         atlasMap.width,
-        atlasMap.height,
-        THREE.RGBAFormat,
-        THREE.FloatType
+        atlasMap.height
       );
 
-      const outputTexture = new THREE.DataTexture(
+      const outputTexture = createFloatTexture(
         new Float32Array(atlasMap.width * atlasMap.height * 4),
         atlasMap.width,
-        atlasMap.height,
-        THREE.RGBAFormat,
-        THREE.FloatType
+        atlasMap.height
       );
 
       setDebugInfo({
@@ -109,12 +121,10 @@ const Lightmap: React.FC<React.PropsWithChildren<LightmapProps>> = ({
             ...prev,
 
             // replace with a new texture with copied source buffer data
-            outputTexture: new THREE.DataTexture(
+            outputTexture: createFloatTexture(
               new Float32Array(data),
               width,
-              height,
-              THREE.RGBAFormat,
-              THREE.FloatType
+              height
             )
           }
       );

@@ -99,6 +99,7 @@ function createRendererTexture(
   texture.magFilter = textureFilter;
   texture.minFilter = textureFilter;
   texture.generateMipmaps = false;
+  texture.channel = 1; // uv2
 
   return [texture, data];
 }
@@ -209,6 +210,8 @@ export async function initializeWorkbench(
       texture.magFilter = irradiance.magFilter;
       texture.minFilter = irradiance.minFilter;
       texture.generateMipmaps = false;
+      texture.channel = 1; // uv2
+      texture.needsUpdate = true;
 
       return texture;
     },
